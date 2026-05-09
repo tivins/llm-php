@@ -38,97 +38,12 @@ class Lama
     }
 
     /**
-     * GET JSON helper used before an instance exists (e.g. /v1/models).
-     *
-     * @throws RuntimeException
-     */
-    private static function httpGetJson(string $fullUrl): array
-    {
-        $curl = curl_init();
-        curl_setopt_array($curl, [
-            CURLOPT_URL => $fullUrl,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPGET => true,
-        ]);
-        $response = curl_exec($curl);
-        $errno = curl_errno($curl);
-        $error = curl_error($curl);
-        curl_close($curl);
-
-        if ($response === false) {
-            throw new RuntimeException("cURL error ($errno): $error");
-        }
-
-        $decoded = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException(
-                'Invalid JSON in response: ' . json_last_error_msg() . ' — ' . substr($response, 0, 200)
-            );
-        }
-
-        if (!is_array($decoded)) {
-            throw new RuntimeException('API returned JSON that is not an object or array');
-        }
-
-        return $decoded;
-    }
-
-    /**
-     * @throws JsonException
-     */
-    private function request(string $url, string $method, array $body): array
-    {
-        $method = strtoupper($method);
-        $options = [
-            CURLOPT_URL => $url,
-            CURLOPT_RETURNTRANSFER => true,
-        ];
-
-        if ($method === 'GET') {
-            $options[CURLOPT_HTTPGET] = true;
-            if ($body !== []) {
-                $query = http_build_query($body);
-                $sep = str_contains($url, '?') ? '&' : '?';
-                $options[CURLOPT_URL] = $url . $sep . $query;
-            }
-        } else {
-            $options[CURLOPT_CUSTOMREQUEST] = $method;
-            $options[CURLOPT_HTTPHEADER] = ['Content-Type: application/json; charset=utf-8'];
-            $options[CURLOPT_POSTFIELDS] = json_encode($body, JSON_THROW_ON_ERROR);
-        }
-
-        $curl = curl_init();
-        curl_setopt_array($curl, $options);
-        $response = curl_exec($curl);
-        $errno = curl_errno($curl);
-        $error = curl_error($curl);
-        curl_close($curl);
-
-        if ($response === false) {
-            throw new RuntimeException("cURL error ($errno): $error");
-        }
-
-        $decoded = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException(
-                'Invalid JSON in response: ' . json_last_error_msg() . ' — ' . substr($response, 0, 200)
-            );
-        }
-
-        if (!is_array($decoded)) {
-            throw new RuntimeException('API returned JSON that is not an object or array');
-        }
-
-        return $decoded;
-    }
-
-    /**
      * @throws JsonException
      */
     public function getHealth(): string
     {
         $raw = $this->getHealthRaw();
-        return $raw['status'] ?? '';
+        return (string) ($raw['status'] ?? '');
     }
 
     /**
@@ -160,7 +75,7 @@ class Lama
     }
 
     /**
-     * Streams OpenAI-compatible SSE from POST /v1/chat/completions with stream: true.
+     * Streams OpenAI-compatible SSE (Server-Sent Events) from POST /v1/chat/completions with stream: true.
      * Invokes $onDelta for each non-empty text fragment in choices[0].delta.content.
      *
      * @param callable(string): void $onDelta
@@ -232,9 +147,7 @@ class Lama
         $httpCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
         curl_close($curl);
 
-        if ($response === false && $errno !== 0) {
-            throw new RuntimeException("cURL error ($errno): $curlError");
-        }
+        self::assertCurlSucceeded($response, $errno, $curlError);
 
         if ($httpCode !== 200) {
             $msg = 'HTTP ' . $httpCode;
@@ -261,4 +174,100 @@ class Lama
             }
         }
     }
+
+    // -- requests --
+
+    /**
+     * GET JSON helper used before an instance exists (e.g. /v1/models).
+     *
+     * @throws RuntimeException
+     */
+    private static function httpGetJson(string $fullUrl): array
+    {
+        return self::executeCurlForJson([
+            CURLOPT_URL => $fullUrl,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPGET => true,
+        ]);
+    }
+
+    /**
+     * @param array<int, mixed> $curlOptions
+     *
+     * @throws RuntimeException
+     */
+    private static function executeCurlForJson(array $curlOptions): array
+    {
+        $curl = curl_init();
+        curl_setopt_array($curl, $curlOptions);
+        $response = curl_exec($curl);
+        $errno = curl_errno($curl);
+        $error = curl_error($curl);
+        curl_close($curl);
+
+        if ($response === false || !is_string($response)) {
+            throw new RuntimeException("cURL error ($errno): $error");
+        }
+
+        return self::decodeJsonArrayResponse($response);
+    }
+
+    /**
+     * @throws RuntimeException
+     */
+    private static function decodeJsonArrayResponse(string $response): array
+    {
+        $decoded = json_decode($response, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new RuntimeException(
+                'Invalid JSON in response: ' . json_last_error_msg() . ' — ' . substr($response, 0, 200)
+            );
+        }
+
+        if (!is_array($decoded)) {
+            throw new RuntimeException('API returned JSON that is not an object or array');
+        }
+
+        return $decoded;
+    }
+
+    /**
+     * @param string|bool $response Value from curl_exec (false on failure, true when using `WRITEFUNCTION` only).
+     *
+     * @throws RuntimeException
+     */
+    private static function assertCurlSucceeded(string|bool $response, int $errno, string $curlError): void
+    {
+        if ($response === false) {
+            throw new RuntimeException("cURL error ($errno): $curlError");
+        }
+    }
+
+    /**
+     * @throws JsonException
+     */
+    private function request(string $url, string $method, array $body): array
+    {
+        $method = strtoupper($method);
+        $options = [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+        ];
+
+        if ($method === 'GET') {
+            $options[CURLOPT_HTTPGET] = true;
+            if ($body !== []) {
+                $query = http_build_query($body);
+                $sep = str_contains($url, '?') ? '&' : '?';
+                $options[CURLOPT_URL] = $url . $sep . $query;
+            }
+        } else {
+            $options[CURLOPT_CUSTOMREQUEST] = $method;
+            $options[CURLOPT_HTTPHEADER] = ['Content-Type: application/json; charset=utf-8'];
+            $options[CURLOPT_POSTFIELDS] = json_encode($body, JSON_THROW_ON_ERROR);
+        }
+
+        return self::executeCurlForJson($options);
+    }
+
 }

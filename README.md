@@ -1,8 +1,8 @@
 # Local LLMs
 
-Objectif: Faire de l'inférence avec un LLM en local sur une machine avec 8Go de VRAM ou plus.
+Goal: Run LLM inference locally on a machine with **8 GB of VRAM or more**.
 
-Stack: Llama.cpp + un modèle léger (Gemma 2 9B, Gemma 4 4.5B, Qwen 2.5 7B, ...).
+Stack: Llama.cpp + a lightweight model (Gemma 2 9B, Gemma 4 4.5B, Qwen 2.5 7B, …).
 
 ## Installation
 
@@ -15,17 +15,17 @@ winget install llama.cpp # windows
 brew install llama.cpp   # mac/linux
 ```
 
-### Télécharger le modèle (<= 6.5Go)
+### Downloading a model (≤ 6.5 GB)
 
-Choisissez un fichier [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) dont la taille laisse de la marge sur votre VRAM (le cache KV et le pilote GPU consomment aussi de la mémoire). Sur une carte **8 Go de VRAM**, visez en pratique **environ 5 à 6,5 Go** pour les poids du modèle, selon la quantification et la taille du contexte.
+Pick a [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) file that leaves headroom on your VRAM—the KV cache and GPU drivers use memory too. On an **8 GB VRAM** card, aim for roughly **about 5 to 6.5 GB** for model weights in practice, depending on quantization and context length.
 
 * https://huggingface.co/bartowski/google_gemma-4-E4B-it-GGUF (google_gemma-4-E4B-it-Q5_K_M.gguf or google_gemma-4-E4B-it-Q6_K.gguf)
 * https://huggingface.co/bartowski/gemma-2-9b-it-GGUF (gemma-2-9b-it-Q4_K_M.gguf)
 * https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF (Qwen2.5-7B-Instruct-Q4_K_M)
 
-## PHP part
+## PHP usage
 
-**Exemple minimal:**
+**Minimal example:**
 
 ```php
 $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
@@ -35,6 +35,6 @@ $conversation->addMessage(new Message(Role::User, 'List and briefly explain five
 $answer = trim($lama->chat($conversation));
 ```
 
-NB: Cet exemple est simplifié, car il ne traite pas les exceptions et ne teste pas si le LLM est disponible (health).
+Note: This example is simplified, it does not handle exceptions and does not check whether the LLM is reachable (health).
 
-Consultez le dossier `exemples` pour plus d'informations.
+See the `examples` folder for more.
