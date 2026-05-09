@@ -9,6 +9,7 @@ use Tivins\Llama\Message;
 use Tivins\Llama\Role;
 use Tivins\Llama\ThinkingChat;
 use Tivins\Llama\ThinkingPrompts;
+use Tivins\Llama\Translator;
 
 require __dir__ . '/../vendor/autoload.php';
 
@@ -36,7 +37,15 @@ try {
     echo "--- end thinking (custom) ---\n";
 
 
-    
+    echo "--- translator (single + batch) ---\n";
+    $translator = new Translator($lama);
+    $single = $translator->translate('Hello, world!', 'English', 'French');
+    echo "[single]\n" . $single . "\n";
+    $batch = $translator->translateBatch(['Good morning.', 'See you soon.'], 'English', 'Spanish');
+    echo "[batch]\n" . implode("\n", $batch) . "\n";
+    echo "--- end translator ---\n";
+
+
     echo "--- two step conversation ---\n";
     $conversation = new Conversation();
     $conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));

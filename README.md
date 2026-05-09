@@ -4,7 +4,17 @@ Goal: Run LLM inference locally on a machine with **8 GB of VRAM or more**.
 
 Stack: Llama.cpp + a lightweight model (Gemma 2 9B, Gemma 4 4B, Qwen 2.5 7B, …).
 
+Beyond exposing llama.cpp from PHP, **llm-php** adds higher-level helpers—such as "thinking"-style prompting and preset personas.
+
+
 ## Installation
+
+### llm-php
+
+```shell
+composer require tivins/llm-php
+```
+
 
 ### llama.cpp
 
