@@ -1,0 +1,17 @@
+{
+    "name": "tivins/llm-php",
+    "version": "1.0.0",
+    "autoload": {
+        "psr-4": {
+            "Tivins\\Llama\\": "src/Tivins/LLama"
+        }
+    },
+    "authors": [
+        {
+            "name": "Tivins",
+            "email": "pub.git@elabo.fr"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {}
+}
