@@ -1,6 +1,11 @@
 {
     "name": "tivins/llm-php",
     "version": "1.0.2",
+    "license": "MIT",
+    "description": "PHP library for local LLMs",
+    "keywords": ["llm", "local", "llama", "php"],
+    "homepage": "https://github.com/tivins/llm-php",
+    "readme": "README.md",
     "autoload": {
         "psr-4": {
             "Tivins\\Llama\\": "src/Tivins/LLama"
