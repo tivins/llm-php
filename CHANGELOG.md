@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.2 — 2026-05-10
+
+- Feature: `BehaviorPrompts` — add `SUMMARIZER`, `MODERATOR`, and `MEDIATOR` personas.
+
 ## 1.2.1 — 2026-05-09
 
 - Docs: `examples/exemples.php` — demo of `Translator::translate()` and `translateBatch()`.
