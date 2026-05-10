@@ -40,7 +40,7 @@ Pick a [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) file th
 ```php
 $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
 $conversation = new Conversation();
-$conversation->addMessage(new Message(Role::System, "You are a helpful assistant."));
+$conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));
 $conversation->addMessage(new Message(Role::User, 'List and briefly explain five practical habits that improve learning retention, with one short paragraph per habit (about 3–5 sentences each).'));
 $answer = trim($lama->chat($conversation));
 ```

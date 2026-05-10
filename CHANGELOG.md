@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.3 — 2026-05-10
+
+- Docs: `examples/mediation.php` — multi-party mediation demo using `BehaviorPrompts::MEDIATOR`; three individuals in conflict over a product launch, three mediator rounds (initial analysis, constraint added, decision-process request).
+
 ## 1.2.2 — 2026-05-10
 
 - Feature: `BehaviorPrompts` — add `SUMMARIZER`, `MODERATOR`, and `MEDIATOR` personas.
