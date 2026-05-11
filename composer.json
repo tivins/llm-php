@@ -8,7 +8,7 @@
     "readme": "README.md",
     "autoload": {
         "psr-4": {
-            "Tivins\\Llama\\": "src/Tivins/LLama"
+            "Tivins\\Llama\\": "src/Tivins/Llama"
         }
     },
     "authors": [
