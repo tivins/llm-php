@@ -17,39 +17,17 @@ require __DIR__ . '/_helpers.php';
 
 $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
 
-
-// 
-// Example 1: Simple completion
 //
-$conversation = new Conversation();
-$conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));
-$conversation->addMessage(new Message(Role::User, "What is the capital of France?"));
-$output = $lama->chatCompletions($conversation);
-print_output($output ?? []);
-
+// example tools (read_file tool)
 //
-// Example 2: option N
-//
-$conversation = new Conversation();
-$conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));
-$conversation->addMessage(new Message(Role::User, "Write a short story (100 words max) about a cat."));
-$output = $lama->chatCompletions($conversation, new ChatCompletionOptions(n: 3));
-print_output($output ?? []);
-
-//
-// Example 3: tools (read_file tool)
-//
-// `parameters` must be a JSON Schema object (`type`, `properties`, `required`, …). A shorthand like
-// `['file_path' => 'string']` is not valid schema; servers and models then ignore property names and may emit
-// `path`, `filename`, etc. See `examples/chat_tools.php` for the same pattern.
 $toolSchemas = [
-    PredefinedTools::readFile()->toToolArray(),
-    PredefinedTools::writeFile()->toToolArray(),
-    PredefinedTools::getDateTime()->toToolArray(),
+    PredefinedTools::getReadFileTool()->toToolArray(),
+    PredefinedTools::getWriteFileTool()->toToolArray(),
+    PredefinedTools::getDateTimeTool()->toToolArray(),
 ];
 $conversation = new Conversation();
 $conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));
-$conversation->addMessage(new Message(Role::User, "Read the file 'story.txt' and return the content."));
+$conversation->addMessage(new Message(Role::User, "Read the file 'story.txt' and return only the content, without markdown formatting."));
 $output = $lama->chatCompletions($conversation, new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto'));
 print_output($output ?? []);
 if (count($output['choices']) > 0) {
@@ -68,15 +46,26 @@ if (count($output['choices']) > 0) {
             $toolName = $toolCall['function']['name'] ?? 'unknown';
             $toolArgs = json_decode($toolCall['function']['arguments'] ?? '[]', true);
             echo "Tool call: " . $toolName . " with args: " . json_encode($toolArgs) . "\n";
-            if ($toolName === 'read_file' && ($toolArgs['file_path'] ?? '') === 'story.txt') {
-                echo "Reading file 'story.txt'\n";
-                $fileContent = "story.txt content";
-                $conversation->addMessage(new Message(
-                    Role::Tool,
-                    $fileContent,
-                    toolCallId: $toolCallId,
-                    name: $toolName,
-                ));
+            if ($toolName === 'read_file' && isset($toolArgs['file_path'])) {
+                $filePath = $toolArgs['file_path'];
+                echo "Reading file '$filePath'\n";
+                $fileContent = PredefinedTools::getExecuteTools()['read_file']($toolArgs);
+                if ($fileContent === false) {
+                    $conversation->addMessage(new Message(
+                        Role::Tool,
+                        json_encode(['error' => 'failed to read file'], JSON_THROW_ON_ERROR),
+                        toolCallId: $toolCallId,
+                        name: $toolName,
+                    ));
+                } 
+                else {
+                    $conversation->addMessage(new Message(
+                        Role::Tool,
+                        $fileContent,
+                        toolCallId: $toolCallId,
+                        name: $toolName,
+                    ));
+                }
             } else {
                 // Still return a result for every call id so the model is not left with a dangling tool_call.
                 $conversation->addMessage(new Message(
