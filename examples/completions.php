@@ -37,13 +37,49 @@ print_output($output ?? []);
 //
 // Example 3: tools (read_file tool)
 //
+// `parameters` must be a JSON Schema object (`type`, `properties`, `required`, …). A shorthand like
+// `['file_path' => 'string']` is not valid schema; servers and models then ignore property names and may emit
+// `path`, `filename`, etc. See `examples/chat_tools.php` for the same pattern.
+$toolSchemas = [
+    new ChatFunctionTool(
+        'read_file',
+        'Read the contents of a file.',
+        [
+            'type' => 'object',
+            'properties' => [
+                'file_path' => [
+                    'type' => 'string',
+                    'description' => 'Path of the file to read.',
+                ],
+            ],
+            'required' => ['file_path'],
+            'additionalProperties' => false,
+        ],
+    )->toToolArray(),
+    new ChatFunctionTool(
+        'write_file',
+        'Write text to a file.',
+        [
+            'type' => 'object',
+            'properties' => [
+                'file_path' => [
+                    'type' => 'string',
+                    'description' => 'Path of the file to write.',
+                ],
+                'content' => [
+                    'type' => 'string',
+                    'description' => 'Full content to write.',
+                ],
+            ],
+            'required' => ['file_path', 'content'],
+            'additionalProperties' => false,
+        ],
+    )->toToolArray(),
+];
 $conversation = new Conversation();
 $conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));
 $conversation->addMessage(new Message(Role::User, "Read the file 'story.txt' and return the content."));
-$output = $lama->chatCompletions($conversation, new ChatCompletionOptions(tools: [
-    new ChatFunctionTool('read_file', 'Read a file', ['file_path' => 'string'])->toToolArray(),
-    new ChatFunctionTool('write_file', 'Write a file', ['file_path' => 'string', 'content' => 'string'])->toToolArray(),
-], tool_choice: 'auto'));
+$output = $lama->chatCompletions($conversation, new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto'));
 print_output($output ?? []);
 if (count($output['choices']) > 0) {
     $toolCalls = $output['choices'][0]['message']['tool_calls'] ?? [];
@@ -56,10 +92,7 @@ if (count($output['choices']) > 0) {
             $fileContent = "story.txt content";
 
             $conversation->addMessage(new Message(Role::Tool, $toolName, $fileContent));
-            $output = $lama->chatCompletions($conversation, new ChatCompletionOptions(tools: [
-                new ChatFunctionTool('read_file', 'Read a file', ['file_path' => 'string'])->toToolArray(),
-                new ChatFunctionTool('write_file', 'Write a file', ['file_path' => 'string', 'content' => 'string'])->toToolArray(),
-            ], tool_choice: 'auto'));
+            $output = $lama->chatCompletions($conversation, new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto'));
             print_output($output ?? []);
         }
     }

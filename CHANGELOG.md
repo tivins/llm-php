@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.1 — 2026-05-12
+
+- Docs: `examples/completions.php` — tools example uses valid JSON Schema for `parameters` (`type`, `properties`, `required`, `additionalProperties`) so models bind consistently to argument names like `file_path`.
+- Docs: `ChatFunctionTool` — class doc warns against invalid shorthand parameter maps.
+
 ## 1.4.0 — 2026-05-12
 
 - Feature: function tools — `ChatFunctionTool` builds OpenAI-style tool entries; `ChatCompletionOptions` gains `tools` and `tool_choice` (merged into chat completion requests). No automatic handling of `tool_calls` responses or tool execution.

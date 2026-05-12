@@ -9,11 +9,12 @@ namespace Tivins\Llama;
  *
  * Serialises to `{ "type": "function", "function": { "name", "description", "parameters" } }`
  * where `parameters` is a [JSON Schema](https://json-schema.org/) object (`type`, `properties`, `required`, …).
+ * Avoid shorthand maps like `['file_path' => 'string']`: they are not valid schema and models may invent keys (`path`, …).
  */
 final readonly class ChatFunctionTool
 {
     /**
-     * @param array<string, mixed> $parameters JSON Schema object for the function arguments (typically `type` => `object`, `properties`, `required`).
+     * @param array<string, mixed> $parameters Full JSON Schema for arguments (`type` => `object`, typed `properties`, `required`).
      */
     public function __construct(
         public string $name,
