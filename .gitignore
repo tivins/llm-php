@@ -2,3 +2,8 @@
 .vscode/
 vendor/
 *.gguf
+
+# tts
+.venv/
+fr_FR-upmc-medium.onnx
+fr_FR-upmc-medium.onnx.json

@@ -21,9 +21,12 @@ composer require tivins/llm-php
 https://github.com/ggml-org/llama.cpp/blob/master/docs/install.md
 
 ```shell
-winget install llama.cpp # windows
+apt install llama-cpp    # linux
 brew install llama.cpp   # mac/linux
+winget install llama.cpp # windows
 ```
+
+API Doc : https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md
 
 ### Downloading a model (≤ 6.5 GB)
 

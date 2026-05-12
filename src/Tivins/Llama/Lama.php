@@ -57,6 +57,17 @@ class Lama
     /**
      * @throws JsonException
      */
+    public function tokenize(string $text): array
+    {
+        $data = $this->request($this->url . '/tokenize', 'POST', [
+            'content' => $text,
+        ]);
+        return $data['tokens'] ?? [];
+    }
+
+    /**
+     * @throws JsonException
+     */
     public function chat(Conversation $conversation): string
     {
         $response = $this->chatCompletions($conversation);
