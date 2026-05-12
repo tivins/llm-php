@@ -82,19 +82,42 @@ $conversation->addMessage(new Message(Role::User, "Read the file 'story.txt' and
 $output = $lama->chatCompletions($conversation, new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto'));
 print_output($output ?? []);
 if (count($output['choices']) > 0) {
-    $toolCalls = $output['choices'][0]['message']['tool_calls'] ?? [];
-    foreach ($toolCalls as $toolCall) {
-        $toolName = $toolCall['function']['name'] ?? 'unknown';
-        $toolArgs = json_decode($toolCall['function']['arguments'] ?? '[]', true);
-        echo "Tool call: " . $toolName . " with args: " . json_encode($toolArgs) . "\n";
-        if ($toolName === 'read_file' && $toolArgs['file_path'] === 'story.txt') {
-            echo "Reading file 'story.txt'\n";
-            $fileContent = "story.txt content";
-
-            $conversation->addMessage(new Message(Role::Tool, $toolName, $fileContent));
-            $output = $lama->chatCompletions($conversation, new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto'));
-            print_output($output ?? []);
+    $assistantPayload = $output['choices'][0]['message'];
+    $toolCalls = $assistantPayload['tool_calls'] ?? [];
+    if ($toolCalls !== []) {
+        // OpenAI-style tool flow: replay the assistant turn with `tool_calls`, then one `tool` message per call
+        // (each must use the same `tool_call_id` as in the assistant message).
+        $conversation->addMessage(new Message(
+            Role::Assistant,
+            (string) ($assistantPayload['content'] ?? ''),
+            toolCalls: $toolCalls,
+        ));
+        foreach ($toolCalls as $toolCall) {
+            $toolCallId = $toolCall['id'] ?? '';
+            $toolName = $toolCall['function']['name'] ?? 'unknown';
+            $toolArgs = json_decode($toolCall['function']['arguments'] ?? '[]', true);
+            echo "Tool call: " . $toolName . " with args: " . json_encode($toolArgs) . "\n";
+            if ($toolName === 'read_file' && ($toolArgs['file_path'] ?? '') === 'story.txt') {
+                echo "Reading file 'story.txt'\n";
+                $fileContent = "story.txt content";
+                $conversation->addMessage(new Message(
+                    Role::Tool,
+                    $fileContent,
+                    toolCallId: $toolCallId,
+                    name: $toolName,
+                ));
+            } else {
+                // Still return a result for every call id so the model is not left with a dangling tool_call.
+                $conversation->addMessage(new Message(
+                    Role::Tool,
+                    json_encode(['error' => 'unsupported or unknown tool arguments'], JSON_THROW_ON_ERROR),
+                    toolCallId: $toolCallId,
+                    name: $toolName,
+                ));
+            }
         }
+        $output = $lama->chatCompletions($conversation, new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto'));
+        print_output($output ?? []);
     }
 }
 

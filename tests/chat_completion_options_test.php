@@ -103,6 +103,43 @@ $assert(
 $force = new ChatCompletionOptions(tool_choice: ['type' => 'function', 'function' => ['name' => 'get_weather']]);
 $assert($force->toRequestBody()['tool_choice']['function']['name'] === 'get_weather', 'tool_choice object');
 
+$toolConv = new Conversation();
+$toolConv->addMessage(new Message(
+    Role::Assistant,
+    '',
+    toolCalls: [
+        [
+            'id' => 'call_1',
+            'type' => 'function',
+            'function' => ['name' => 'read_file', 'arguments' => '{}'],
+        ],
+    ],
+));
+$toolConv->addMessage(new Message(Role::Tool, 'file contents', toolCallId: 'call_1', name: 'read_file'));
+$toolMsgs = $toolConv->toChatCompletionMessages();
+$assert(
+    $toolMsgs === [
+        [
+            'role' => 'assistant',
+            'tool_calls' => [
+                [
+                    'id' => 'call_1',
+                    'type' => 'function',
+                    'function' => ['name' => 'read_file', 'arguments' => '{}'],
+                ],
+            ],
+            'content' => null,
+        ],
+        [
+            'role' => 'tool',
+            'tool_call_id' => 'call_1',
+            'content' => 'file contents',
+            'name' => 'read_file',
+        ],
+    ],
+    'tool turn serialization',
+);
+
 $skipEmptyToolChoice = new ChatCompletionOptions(tool_choice: '');
 $assert(!array_key_exists('tool_choice', $skipEmptyToolChoice->toRequestBody()), 'empty tool_choice omitted');
 

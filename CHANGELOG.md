@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.0 — 2026-05-12
+
+- Feature: `Message` supports optional `toolCallId`, `name`, and `toolCalls` for OpenAI-compatible tool follow-ups; `Conversation::toChatCompletionMessages()` emits `tool_calls` on assistant messages and `tool_call_id` on tool messages.
+- Docs: `examples/completions.php` — correct tool round-trip (assistant replay + tool results) after `finish_reason: tool_calls`.
+
 ## 1.4.1 — 2026-05-12
 
 - Docs: `examples/completions.php` — tools example uses valid JSON Schema for `parameters` (`type`, `properties`, `required`, `additionalProperties`) so models bind consistently to argument names like `file_path`.
