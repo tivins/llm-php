@@ -16,6 +16,11 @@ use RuntimeException;
  */
 class Lama
 {
+    /**
+     * @param string $url The base URL of the API server.
+     * @param string $model The model to use.
+     * @see fromServerUrl() for a more convenient way to create a client.
+     */
     public function __construct(
         public string $url,
         public string $model,
@@ -73,7 +78,7 @@ class Lama
     }
 
     /**
-     * Returns the assistant message content for the first completion choice.
+     * This function is a shortcut for {@see chatCompletions} and returns the assistant message content for the first completion choice.
      *
      * @param ChatCompletionOptions|null $options Optional sampling and generation parameters (temperature, top_p, …).
      *                                            See {@see ChatCompletionOptions}.
