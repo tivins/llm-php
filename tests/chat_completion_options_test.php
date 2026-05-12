@@ -9,6 +9,7 @@ declare(strict_types=1);
  */
 
 use Tivins\Llama\ChatCompletionOptions;
+use Tivins\Llama\ChatFunctionTool;
 use Tivins\Llama\Conversation;
 use Tivins\Llama\Lama;
 use Tivins\Llama\Message;
@@ -88,6 +89,25 @@ $assert(
     $merged['temperature'] === 0.5 && $merged['top_p'] === 0.95 && $merged['model'] === 'test-model',
     'options merged into body',
 );
+
+$tool = new ChatFunctionTool('fn', 'desc', ['type' => 'object', 'properties' => []]);
+$withTools = new ChatCompletionOptions(tools: [$tool->toToolArray()], tool_choice: 'auto');
+$tBody = $withTools->toRequestBody();
+$assert(isset($tBody['tools']) && count($tBody['tools']) === 1, 'tools in body');
+$assert($tBody['tool_choice'] === 'auto', 'tool_choice string');
+$assert(
+    $tBody['tools'][0]['function']['name'] === 'fn',
+    'tool function name',
+);
+
+$force = new ChatCompletionOptions(tool_choice: ['type' => 'function', 'function' => ['name' => 'get_weather']]);
+$assert($force->toRequestBody()['tool_choice']['function']['name'] === 'get_weather', 'tool_choice object');
+
+$skipEmptyToolChoice = new ChatCompletionOptions(tool_choice: '');
+$assert(!array_key_exists('tool_choice', $skipEmptyToolChoice->toRequestBody()), 'empty tool_choice omitted');
+
+$skipEmptyTools = new ChatCompletionOptions(tools: []);
+$assert(!array_key_exists('tools', $skipEmptyTools->toRequestBody()), 'empty tools list omitted');
 
 if ($failed > 0) {
     exit(1);

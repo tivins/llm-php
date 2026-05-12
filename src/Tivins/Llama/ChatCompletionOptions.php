@@ -24,6 +24,11 @@ namespace Tivins\Llama;
  *
  * **Stopping** — {@see self::$stop} is either one sequence or several sequences that cut generation
  * when emitted at the end of new text (the stop string itself is usually not included in the reply).
+ *
+ * **Tools (function calling)** — {@see self::$tools} declares functions the model may call; {@see self::$tool_choice}
+ * steers whether/how tools are selected. The assistant reply may contain `tool_calls` instead of plain `content`;
+ * this library does not execute tools or build follow-up `tool` messages — use {@see Lama::chatCompletions()} and
+ * inspect the decoded array. See {@see ChatFunctionTool} to build each tool entry.
  */
 final class ChatCompletionOptions
 {
@@ -37,6 +42,8 @@ final class ChatCompletionOptions
      * @param ?int $seed If supported, fixes the random seed for reproducible sampling (integer).
      * @param string|list<string>|null $stop One or more stop sequences. Empty string or empty list is treated as “not set”.
      * @param ?int $n How many chat completion choices to generate. Note: {@see Lama::chat()} still reads only the first choice.
+     * @param list<array<string, mixed>>|null $tools OpenAI `tools` array; use {@see ChatFunctionTool::toToolArray()} per function. Empty list is omitted.
+     * @param string|array<string, mixed>|null $tool_choice e.g. `'auto'`, `'none'`, `'required'`, or a forcing object `['type' => 'function', 'function' => ['name' => '…']]`. Empty string is omitted.
      */
     public function __construct(
         public ?float $temperature = null,
@@ -47,6 +54,8 @@ final class ChatCompletionOptions
         public ?int $seed = null,
         public string|array|null $stop = null,
         public ?int $n = null,
+        public ?array $tools = null,
+        public string|array|null $tool_choice = null,
     ) {
     }
 
@@ -88,6 +97,15 @@ final class ChatCompletionOptions
                 }
             } elseif ($this->stop !== []) {
                 $out['stop'] = array_values($this->stop);
+            }
+        }
+
+        if ($this->tools !== null && $this->tools !== []) {
+            $out['tools'] = array_values($this->tools);
+        }
+        if ($this->tool_choice !== null) {
+            if (!is_string($this->tool_choice) || $this->tool_choice !== '') {
+                $out['tool_choice'] = $this->tool_choice;
             }
         }
 

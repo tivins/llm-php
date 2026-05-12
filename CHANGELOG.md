@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.0 — 2026-05-12
+
+- Feature: function tools — `ChatFunctionTool` builds OpenAI-style tool entries; `ChatCompletionOptions` gains `tools` and `tool_choice` (merged into chat completion requests). No automatic handling of `tool_calls` responses or tool execution.
+- Docs: `examples/chat_tools.php` — `chatCompletions()` with tools and pretty-printed raw JSON response.
+
 ## 1.3.0 — 2026-05-12
 
 - Feature: `ChatCompletionOptions` — OpenAI-style chat completion parameters (`temperature`, `top_p`, `max_tokens`, `frequency_penalty`, `presence_penalty`, `seed`, `stop`, `n`) with documented semantics; optional third argument to `Lama::chatStream`, optional second argument to `Lama::chat` / `Lama::chatCompletions`.
