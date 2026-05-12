@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1 — 2026-05-13
+
+- Feature: `PredefinedTools::runTool()` dispatches predefined executors and normalizes outputs for `Role::Tool` messages; `readFile` / `writeFile` now report failures honestly (`string|false`, `bool`), treat empty-path arguments as failures, preserve empty-file reads as empty strings (not failures), and use silent I/O for expected misses so tooling is not drowned in notices; `getDateTime()` accepts optional parameters for callable parity.
+- Docs: `examples/tools_chain.php` — multi-round tool loop, strict JSON decoding of arguments, schemas from `PredefinedTools::all()`; `examples/completions.php` — tool schemas wired to `PredefinedTools::all()`.
+- Tests: `tests/predefined_tools_test.php` — dispatcher and I/O behaviour (no LLM server).
+
 ## 1.5.0 — 2026-05-12
 
 - Feature: `Message` supports optional `toolCallId`, `name`, and `toolCalls` for OpenAI-compatible tool follow-ups; `Conversation::toChatCompletionMessages()` emits `tool_calls` on assistant messages and `tool_call_id` on tool messages.

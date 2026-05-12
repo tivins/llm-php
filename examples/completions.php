@@ -42,11 +42,10 @@ print_output($output ?? []);
 // `parameters` must be a JSON Schema object (`type`, `properties`, `required`, …). A shorthand like
 // `['file_path' => 'string']` is not valid schema; servers and models then ignore property names and may emit
 // `path`, `filename`, etc. See `examples/chat_tools.php` for the same pattern.
-$toolSchemas = [
-    PredefinedTools::readFile()->toToolArray(),
-    PredefinedTools::writeFile()->toToolArray(),
-    PredefinedTools::getDateTime()->toToolArray(),
-];
+$toolSchemas = array_map(
+    static fn (ChatFunctionTool $tool): array => $tool->toToolArray(),
+    PredefinedTools::all(),
+);
 $conversation = new Conversation();
 $conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));
 $conversation->addMessage(new Message(Role::User, "Read the file 'story.txt' and return the content."));
