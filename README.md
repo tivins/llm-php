@@ -48,6 +48,15 @@ $conversation->addMessage(new Message(Role::User, 'List and briefly explain five
 $answer = trim($lama->chat($conversation));
 ```
 
+**Sampling and generation options** (OpenAI-compatible body fields such as `temperature`, `top_p`, `max_tokens`, penalties, `seed`, `stop`, `n`) are passed via `ChatCompletionOptions` as an optional argument to `chat()`, `chatCompletions()`, and `chatStream()`. Only properties you set are sent; omitted fields keep the server defaults. See the class docblock on `ChatCompletionOptions` for parameter meanings and compatibility notes for local backends.
+
+```php
+use Tivins\Llama\ChatCompletionOptions;
+
+$sampler = new ChatCompletionOptions(temperature: 0.4, top_p: 0.9, max_tokens: 256, seed: 42);
+$answer = trim($lama->chat($conversation, $sampler));
+```
+
 Note: This example is simplified, it does not handle exceptions and does not check whether the LLM is reachable (health).
 
 See the `examples` folder for more.

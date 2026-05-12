@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Tivins\Llama\BehaviorPrompts;
+use Tivins\Llama\ChatCompletionOptions;
 use Tivins\Llama\Conversation;
 use Tivins\Llama\Lama;
 use Tivins\Llama\Message;
@@ -69,10 +70,14 @@ try {
         'List and briefly explain five practical habits that improve learning retention, with one short paragraph per habit (about 3–5 sentences each).',
     ));
     $fullStream = '';
-    $lama->chatStream($streamConv, static function (string $delta) use (&$fullStream): void {
-        $fullStream .= $delta;
-        echo $delta;
-    });
+    $lama->chatStream(
+        $streamConv,
+        static function (string $delta) use (&$fullStream): void {
+            $fullStream .= $delta;
+            echo $delta;
+        },
+        new ChatCompletionOptions(temperature: 0.7, top_p: 0.95),
+    );
     echo "\n--- end stream (length " . strlen($fullStream) . " bytes) ---\n";
 
     exit(0);

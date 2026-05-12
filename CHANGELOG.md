@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0 — 2026-05-12
+
+- Feature: `ChatCompletionOptions` — OpenAI-style chat completion parameters (`temperature`, `top_p`, `max_tokens`, `frequency_penalty`, `presence_penalty`, `seed`, `stop`, `n`) with documented semantics; optional third argument to `Lama::chatStream`, optional second argument to `Lama::chat` / `Lama::chatCompletions`.
+- Tests: `tests/chat_completion_options_test.php` — serialization and request-body merge checks (no server required).
+- Docs: README and `examples/exemples.php` — usage of `ChatCompletionOptions` with `chat()` / `chatStream()`.
+
 ## 1.2.3 — 2026-05-10
 
 - Docs: `examples/mediation.php` — multi-party mediation demo using `BehaviorPrompts::MEDIATOR`; three individuals in conflict over a product launch, three mediator rounds (initial analysis, constraint added, decision-process request).

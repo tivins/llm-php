@@ -7,6 +7,13 @@ namespace Tivins\Llama;
 use JsonException;
 use RuntimeException;
 
+/**
+ * HTTP client for an OpenAI-compatible chat/tokenize/health API (e.g. llama.cpp server).
+ *
+ * Use {@see ChatCompletionOptions} with {@see self::chat}, {@see self::chatCompletions}, and {@see self::chatStream}
+ * to control sampling (`temperature`, `top_p`, …) and generation limits; omitted option fields are not sent so the
+ * server keeps its defaults.
+ */
 class Lama
 {
     public function __construct(
@@ -66,23 +73,33 @@ class Lama
     }
 
     /**
+     * Returns the assistant message content for the first completion choice.
+     *
+     * @param ChatCompletionOptions|null $options Optional sampling and generation parameters (temperature, top_p, …).
+     *                                            See {@see ChatCompletionOptions}.
+     *
      * @throws JsonException
      */
-    public function chat(Conversation $conversation): string
+    public function chat(Conversation $conversation, ?ChatCompletionOptions $options = null): string
     {
-        $response = $this->chatCompletions($conversation);
+        $response = $this->chatCompletions($conversation, $options);
         return $response['choices'][0]['message']['content'] ?? '';
     }
 
     /**
+     * Raw OpenAI-style chat completion response (decoded JSON).
+     *
+     * @param ChatCompletionOptions|null $options Optional parameters merged into the request body; see {@see ChatCompletionOptions}.
+     *
      * @throws JsonException
      */
-    public function chatCompletions(Conversation $conversation): array
+    public function chatCompletions(Conversation $conversation, ?ChatCompletionOptions $options = null): array
     {
-        return $this->request($this->url . '/v1/chat/completions', 'POST', [
-            'model' => $this->model,
-            'messages' => $conversation->toChatCompletionMessages(),
-        ]);
+        return $this->request(
+            $this->url . '/v1/chat/completions',
+            'POST',
+            $this->chatCompletionRequestBody($conversation, $options, stream: false),
+        );
     }
 
     /**
@@ -90,17 +107,14 @@ class Lama
      * Invokes $onDelta for each non-empty text fragment in choices[0].delta.content.
      *
      * @param callable(string): void $onDelta
+     * @param ChatCompletionOptions|null $options Same sampling fields as non-streaming calls; applied to the streamed completion.
      *
      * @throws JsonException
      */
-    public function chatStream(Conversation $conversation, callable $onDelta): void
+    public function chatStream(Conversation $conversation, callable $onDelta, ?ChatCompletionOptions $options = null): void
     {
         $url = $this->url . '/v1/chat/completions';
-        $payload = [
-            'model' => $this->model,
-            'messages' => $conversation->toChatCompletionMessages(),
-            'stream' => true,
-        ];
+        $payload = $this->chatCompletionRequestBody($conversation, $options, stream: true);
 
         $lineBuffer = '';
         $errorBody = '';
@@ -184,6 +198,27 @@ class Lama
                 }
             }
         }
+    }
+
+    /**
+     * Assembles the JSON body for {@see chatCompletions} and {@see chatStream}.
+     *
+     * @return array<string, mixed>
+     */
+    private function chatCompletionRequestBody(Conversation $conversation, ?ChatCompletionOptions $options, bool $stream): array
+    {
+        $body = [
+            'model' => $this->model,
+            'messages' => $conversation->toChatCompletionMessages(),
+        ];
+        if ($stream) {
+            $body['stream'] = true;
+        }
+        if ($options !== null) {
+            $body = array_merge($body, $options->toRequestBody());
+        }
+
+        return $body;
     }
 
     // -- requests --
