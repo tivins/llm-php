@@ -96,12 +96,25 @@ $noPhpunit = PredefinedTools::runTool('run_phpunit', [
 ]);
 $assert(str_contains($noPhpunit, 'not found'), 'run_phpunit should error when script is missing');
 
-$ws = PredefinedTools::runTool('web_search', ['query' => 'OpenAI']);
+$ws = PredefinedTools::runTool('web_search', ['query' => 'OpenAI', 'max_results' => 3]);
 $wsJson = json_decode($ws, true);
 $assert(
-    is_array($wsJson) && (isset($wsJson['abstract']) || isset($wsJson['error'])),
-    'web_search should return JSON with abstract or error',
+    is_array($wsJson) && (isset($wsJson['results']) || isset($wsJson['error'])),
+    'web_search should return JSON with results array or error',
 );
+if (isset($wsJson['results'])) {
+    $assert(
+        is_array($wsJson['results']) && count($wsJson['results']) <= 3,
+        'web_search results should respect max_results cap',
+    );
+    if (count($wsJson['results']) > 0) {
+        $first = $wsJson['results'][0];
+        $assert(
+            isset($first['title'], $first['url'], $first['snippet']) && str_starts_with($first['url'], 'http'),
+            'web_search result entries should have title, url (http), and snippet',
+        );
+    }
+}
 
 $badFetch = PredefinedTools::runTool('fetch_web_page', ['url' => 'ftp://example.com/file']);
 $badFetchJson = json_decode($badFetch, true);

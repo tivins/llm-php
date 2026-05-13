@@ -11,9 +11,31 @@ namespace Tivins\Llama;
  * `properties`, `required`, …). Shorthand maps like `['file_path' => 'string']` are not valid
  * schema and may cause models to emit arbitrary argument keys (`path`, `filename`, …).
  * See {@see examples/chat_tools.php} for the same pattern.
+ *
+ * Outbound HTTPS ({@see webSearch}, {@see fetchWebPage}): TLS verification defaults to strict.
+ * On hosts without a CA bundle (common on Windows PHP), set `php.ini` `curl.cainfo`, or env
+ * `TIVINS_LLAMA_CURL_CAINFO` to a PEM file (e.g. from https://curl.se/ca/cacert.pem ).
+ * On **Windows**, when `TIVINS_LLAMA_CURL_CAINFO` is **not** set (or unreadable), PHP 8.2+ may enable
+ * `CURLSSLOPT_NATIVE_CA` so system roots apply (helps corporate TLS inspection).
+ * Set env `TIVINS_LLAMA_CURL_WINDOWS_NATIVE_CA=1` to prefer that store even if `TIVINS_LLAMA_CURL_CAINFO`
+ * is set (mozilla-only bundles often fail behind intercepting proxies); `=0` disables native CA.
+ * Call {@see setHttpSslVerifyPeer}(false) only on trusted networks (insecure).
+ * Env `TIVINS_LLAMA_HTTP_SSL_VERIFY`: `0` / `false` / `no` / `off` disables verification.
  */
 class PredefinedTools
 {
+    private static bool $httpSslVerifyPeer = true;
+
+    /**
+     * When false, disables TLS certificate verification for {@see webSearch} and {@see fetchWebPage}
+     * (vulnerable to MITM — use only on trusted networks). Env `TIVINS_LLAMA_HTTP_SSL_VERIFY`
+     * overrides when set (`0`, `false`, `no`, `off` → disable).
+     */
+    public static function setHttpSslVerifyPeer(bool $verify): void
+    {
+        self::$httpSslVerifyPeer = $verify;
+    }
+
     public static function getReadFileTool(): ChatFunctionTool
     {
         return new ChatFunctionTool(
@@ -112,13 +134,18 @@ class PredefinedTools
     {
         return new ChatFunctionTool(
             'web_search',
-            'Search the web for summaries and instant answers via DuckDuckGo JSON API (not full page HTML). Use fetch_web_page to load a specific URL.',
+            'Search the web via DuckDuckGo HTML and return real result entries (title, url, snippet). Use fetch_web_page to read the full body of a returned URL.',
             [
                 'type' => 'object',
                 'properties' => [
                     'query' => [
                         'type' => 'string',
                         'description' => 'Search query.',
+                    ],
+                    'max_results' => [
+                        'type' => 'integer',
+                        'description' => 'Maximum number of results to return (default 8, max 20).',
+                        'default' => 8,
                     ],
                 ],
                 'required' => ['query'],
@@ -459,6 +486,79 @@ class PredefinedTools
     }
 
     /**
+     * TLS options for {@see webSearch} and {@see fetchWebPage}.
+     *
+     * @return array<int, mixed>
+     */
+    private static function httpSslCurlOpts(): array
+    {
+        $verify = self::$httpSslVerifyPeer;
+        $envVerify = getenv('TIVINS_LLAMA_HTTP_SSL_VERIFY');
+        if ($envVerify !== false && (string) $envVerify !== '') {
+            $verify = !in_array(strtolower((string) $envVerify), ['0', 'false', 'no', 'off'], true);
+        }
+
+        $opts = [
+            CURLOPT_SSL_VERIFYPEER => $verify,
+            CURLOPT_SSL_VERIFYHOST => $verify ? 2 : 0,
+        ];
+
+        $cainfoEnv = getenv('TIVINS_LLAMA_CURL_CAINFO');
+        $cainfoUsable = is_string($cainfoEnv) && $cainfoEnv !== '' && is_readable($cainfoEnv);
+
+        $nativeCaDisabled = getenv('TIVINS_LLAMA_CURL_WINDOWS_NATIVE_CA') === '0';
+        $nativeCaForced = getenv('TIVINS_LLAMA_CURL_WINDOWS_NATIVE_CA') === '1';
+
+        $useWindowsNativeCa = $verify
+            && PHP_OS_FAMILY === 'Windows'
+            && defined('CURLSSLOPT_NATIVE_CA')
+            && !$nativeCaDisabled
+            && (!$cainfoUsable || $nativeCaForced);
+
+        if ($useWindowsNativeCa) {
+            $opts[CURLOPT_SSL_OPTIONS] = CURLSSLOPT_NATIVE_CA;
+        }
+
+        if ($cainfoUsable && (!$nativeCaForced || !$useWindowsNativeCa)) {
+            $opts[CURLOPT_CAINFO] = $cainfoEnv;
+        }
+
+        return $opts;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private static function maybeAddSslHint(array &$payload, string $curlError): void
+    {
+        $msg = strtolower($curlError);
+        if ($msg === '') {
+            return;
+        }
+
+        if (
+            !str_contains($msg, 'ssl')
+            && !str_contains($msg, 'certificate')
+            && !str_contains($msg, 'openssl')
+        ) {
+            return;
+        }
+
+        $payload['hint'] = 'Corporate TLS inspection often breaks mozilla-only CA bundles ('
+            . '"self-signed certificate in certificate chain"). '
+            . 'On Windows, omit `TIVINS_LLAMA_CURL_CAINFO` so the OS certificate store can be used '
+            . '(PHP 8.2+ with CURLSSLOPT_NATIVE_CA), or set `TIVINS_LLAMA_CURL_WINDOWS_NATIVE_CA=1` '
+            . 'to prefer that store even when `TIVINS_LLAMA_CURL_CAINFO` is set. '
+            . 'Alternatively append your organization root CA to the PEM file, or '
+            . '`PredefinedTools::setHttpSslVerifyPeer(false)` on a trusted network only.';
+    }
+
+    /**
+     * Fetches DuckDuckGo HTML search results and parses real result entries.
+     *
+     * The legacy JSON Instant Answer API (`api.duckduckgo.com`) returns empty data for most
+     * queries; the HTML endpoint (`html.duckduckgo.com/html/`) always returns ranked results.
+     *
      * @return array<string, mixed>
      */
     public static function webSearch(array $parameters): array
@@ -468,12 +568,10 @@ class PredefinedTools
             return ['error' => 'query must be a non-empty string'];
         }
 
-        $url = 'https://api.duckduckgo.com/?' . http_build_query([
-            'q' => $query,
-            'format' => 'json',
-            'no_html' => '1',
-            'skip_disambig' => '1',
-        ]);
+        $maxResults = isset($parameters['max_results']) ? (int) $parameters['max_results'] : 8;
+        $maxResults = max(1, min(20, $maxResults));
+
+        $url = 'https://html.duckduckgo.com/html/?' . http_build_query(['q' => $query]);
 
         $ch = curl_init($url);
         if ($ch === false) {
@@ -483,30 +581,96 @@ class PredefinedTools
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 20,
-            CURLOPT_USERAGENT => 'tivins/llm-php (PredefinedTools; +https://github.com/tivins/llm-php)',
-        ]);
+            CURLOPT_ENCODING => '',
+            CURLOPT_USERAGENT => 'Mozilla/5.0 (compatible; tivins/llm-php; +https://github.com/tivins/llm-php)',
+        ] + self::httpSslCurlOpts());
 
         $body = curl_exec($ch);
         $err = curl_error($ch);
+        $errno = curl_errno($ch);
         $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
 
         if ($body === false || $body === '') {
-            return ['error' => $err !== '' ? $err : 'empty response', 'http_status' => $code];
+            $payload = ['error' => $err !== '' ? $err : 'empty response', 'http_status' => $code];
+            if ($errno !== 0) {
+                $payload['curl_errno'] = $errno;
+            }
+            self::maybeAddSslHint($payload, $err);
+
+            return $payload;
         }
 
-        $decoded = json_decode($body, true);
-        if (!is_array($decoded)) {
-            return ['error' => 'invalid JSON in response', 'http_status' => $code];
+        if ($code !== 200) {
+            return ['error' => 'unexpected HTTP status', 'http_status' => $code];
         }
 
-        return [
-            'abstract' => (string) ($decoded['Abstract'] ?? ''),
-            'abstract_url' => (string) ($decoded['AbstractURL'] ?? ''),
-            'related_topics' => self::flattenDdgTopics($decoded['RelatedTopics'] ?? []),
-            'answer' => (string) ($decoded['Answer'] ?? ''),
-            'http_status' => $code,
-        ];
+        $results = self::parseDdgHtmlResults((string) $body, $maxResults);
+
+        return ['results' => $results, 'http_status' => $code];
+    }
+
+    /**
+     * Parses the result title links and snippet elements from a DuckDuckGo HTML search page.
+     *
+     * Each result link has the form `/l/?uddg=ENCODED_URL&…`; snippets follow in matching order.
+     *
+     * @return list<array{title: string, url: string, snippet: string}>
+     */
+    private static function parseDdgHtmlResults(string $html, int $max): array
+    {
+        $results = [];
+
+        // Title links: `<a … class="result__a" href="//duckduckgo.com/l/?uddg=ENCODED_URL&amp;…">Title</a>`
+        // The href prefix is `//duckduckgo.com/l/?uddg=`; `&amp;` separates the URL from the `rut` param.
+        preg_match_all(
+            '/<a\b[^>]*\bclass="result__a"[^>]*\bhref="[^"]*\/l\/\?uddg=([^"&]+)[^"]*"[^>]*>(.*?)<\/a>/si',
+            $html,
+            $titleMatches,
+            PREG_SET_ORDER,
+        );
+
+        // Snippets: `<a … class="result__snippet" …>Text</a>`
+        preg_match_all(
+            '/<a\b[^>]*\bclass="result__snippet"[^>]*>(.*?)<\/a>/si',
+            $html,
+            $snippetMatches,
+            PREG_SET_ORDER,
+        );
+
+        foreach ($titleMatches as $i => $m) {
+            if (count($results) >= $max) {
+                break;
+            }
+
+            $url = urldecode($m[1]);
+            if (!str_starts_with($url, 'http')) {
+                continue;
+            }
+
+            $title = trim(preg_replace(
+                '/\s+/',
+                ' ',
+                strip_tags(html_entity_decode($m[2], ENT_QUOTES | ENT_HTML5, 'UTF-8')),
+            ) ?? '');
+
+            if ($title === '') {
+                continue;
+            }
+
+            $snippet = '';
+            if (isset($snippetMatches[$i][1])) {
+                $snippet = trim(preg_replace(
+                    '/\s+/',
+                    ' ',
+                    strip_tags(html_entity_decode($snippetMatches[$i][1], ENT_QUOTES | ENT_HTML5, 'UTF-8')),
+                ) ?? '');
+            }
+
+            $results[] = ['title' => $title, 'url' => $url, 'snippet' => $snippet];
+        }
+
+        return $results;
     }
 
     /**
@@ -551,7 +715,6 @@ class PredefinedTools
             CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_ENCODING => '',
-            CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_WRITEFUNCTION => static function ($ch, string $chunk) use (&$body, &$truncated, $maxBytes): int {
                 $len = strlen($chunk);
                 $have = strlen($body);
@@ -571,7 +734,7 @@ class PredefinedTools
 
                 return $len;
             },
-        ]);
+        ] + self::httpSslCurlOpts());
 
         curl_exec($ch);
         $err = curl_error($ch);
@@ -582,7 +745,10 @@ class PredefinedTools
         curl_close($ch);
 
         if ($body === '' && $errno !== 0) {
-            return ['error' => $err !== '' ? $err : 'request failed', 'curl_errno' => $errno];
+            $payload = ['error' => $err !== '' ? $err : 'request failed', 'curl_errno' => $errno];
+            self::maybeAddSslHint($payload, $err);
+
+            return $payload;
         }
 
         return [
@@ -592,33 +758,6 @@ class PredefinedTools
             'truncated' => $truncated,
             'body' => $body,
         ];
-    }
-
-    /**
-     * @param mixed $topics
-     * @return list<string>
-     */
-    private static function flattenDdgTopics(mixed $topics, int $limit = 15): array
-    {
-        if (!is_array($topics)) {
-            return [];
-        }
-
-        $out = [];
-        foreach ($topics as $t) {
-            if (count($out) >= $limit) {
-                break;
-            }
-            if (is_string($t)) {
-                $out[] = $t;
-                continue;
-            }
-            if (is_array($t) && isset($t['Text']) && is_string($t['Text'])) {
-                $out[] = $t['Text'];
-            }
-        }
-
-        return $out;
     }
 
     /**

@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.7.4 — 2026-05-13
+
+- Fix: `web_search` migrated from `api.duckduckgo.com` JSON Instant Answer API (always returned empty for most queries) to `html.duckduckgo.com/html/` HTML scraping; now returns `results[]` with `title`, `url`, `snippet` for real ranked results; adds optional `max_results` parameter (default 8, max 20); removes unused `flattenDdgTopics`.
+- Fix: corrected `result__a` href regex (`//duckduckgo.com/l/?uddg=` prefix instead of `/l/?uddg=`); parser now extracts URLs and titles correctly.
+
+## 1.7.3 — 2026-05-13
+
+- Feature: Windows outbound HTTPS defaults to `CURLSSLOPT_NATIVE_CA` when no usable `TIVINS_LLAMA_CURL_CAINFO` is set (PHP 8.2+); env `TIVINS_LLAMA_CURL_WINDOWS_NATIVE_CA=1` prefers the OS trust store even when `TIVINS_LLAMA_CURL_CAINFO` is set (`=0` disables native CA); PEM fallback kept when native CA is unavailable or forced mode cannot apply.
+- Feature: SSL-related `web_search` / `fetch_web_page` failures include `curl_errno` where relevant and a concrete `hint` for corporate TLS inspection.
+- Docs: `examples/web_lookup_chain.php` explains mozilla-bundle vs OS store vs `WINDOWS_NATIVE_CA`.
+
+## 1.7.2 — 2026-05-13
+
+- Feature: configurable TLS for `web_search` / `fetch_web_page` — env `TIVINS_LLAMA_CURL_CAINFO` (PEM bundle), env `TIVINS_LLAMA_HTTP_SSL_VERIFY`, and `PredefinedTools::setHttpSslVerifyPeer()` for trusted dev environments without CA bundle (e.g. Windows PHP).
+- Docs: `examples/web_lookup_chain.php` documents SSL troubleshooting.
+
+## 1.7.1 — 2026-05-13
+
+- Docs: `examples/web_lookup_chain.php` — multi-round tool loop like `examples/tools_chain.php`, restricted to `web_search` + `fetch_web_page` with system guidance for precise web facts (French demo prompt).
+
 ## 1.7.0 — 2026-05-13
 
 - Feature: `PredefinedTools::getFetchWebPageTool()` / `fetch_web_page` — HTTP GET for http/https URLs via cURL, optional `max_bytes` cap (default 512 KiB, max 2 MiB), redirects limited to http/https; clarifies `web_search` description (DuckDuckGo summaries vs full pages).
