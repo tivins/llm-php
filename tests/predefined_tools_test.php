@@ -58,6 +58,76 @@ $assert(
 
 $tools = PredefinedTools::getExecuteTools();
 $assert(isset($tools['read_file'], $tools['write_file'], $tools['get_date_time']), 'executors registry should define known tools');
+$assert(
+    isset($tools['grep'], $tools['web_search'], $tools['apply_diff'], $tools['git_status'], $tools['run_phpunit']),
+    'executors registry should define grep / web_search / apply_diff / git_status / run_phpunit',
+);
+
+$grepDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'predefined_tools_grep_' . uniqid('', true);
+mkdir($grepDir, 0700, true);
+$grepFileA = $grepDir . DIRECTORY_SEPARATOR . 'a.txt';
+$grepFileB = $grepDir . DIRECTORY_SEPARATOR . 'b.txt';
+file_put_contents($grepFileA, "line one\nneedle here\n");
+file_put_contents($grepFileB, "other\nnot here\n");
+$grepOut = PredefinedTools::runTool('grep', ['pattern' => 'needle', 'path' => $grepDir]);
+$grepJson = json_decode($grepOut, true);
+$assert(is_array($grepJson) && isset($grepJson['matches']) && count($grepJson['matches']) === 1, 'grep should find one line in temp tree');
+@unlink($grepFileA);
+@unlink($grepFileB);
+@rmdir($grepDir);
+
+$badGrep = PredefinedTools::runTool('grep', ['pattern' => '', 'path' => __DIR__]);
+$assert(str_contains($badGrep, 'error'), 'grep with empty pattern should report error');
+
+$repoRoot = realpath(__DIR__ . '/..');
+$assert($repoRoot !== false, 'test suite should live inside a resolvable repo root');
+if ($repoRoot !== false) {
+    $gs = PredefinedTools::runTool('git_status', ['working_directory' => $repoRoot]);
+    $gsJson = json_decode($gs, true);
+    $assert(
+        is_array($gsJson) && array_key_exists('exit_code', $gsJson) && $gsJson['exit_code'] === 0,
+        'git_status in repo root should exit 0',
+    );
+}
+
+$noPhpunit = PredefinedTools::runTool('run_phpunit', [
+    'working_directory' => $repoRoot ?: __DIR__,
+    'phpunit_path' => 'vendor/bin/phpunit___missing___',
+]);
+$assert(str_contains($noPhpunit, 'not found'), 'run_phpunit should error when script is missing');
+
+$ws = PredefinedTools::runTool('web_search', ['query' => 'OpenAI']);
+$wsJson = json_decode($ws, true);
+$assert(
+    is_array($wsJson) && (isset($wsJson['abstract']) || isset($wsJson['error'])),
+    'web_search should return JSON with abstract or error',
+);
+
+$patchDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'predefined_tools_patch_' . uniqid('', true);
+mkdir($patchDir, 0700, true);
+$pFile = $patchDir . DIRECTORY_SEPARATOR . 'patchme.txt';
+file_put_contents($pFile, "a\n");
+$unifiedDiff = <<<DIFF
+diff --git a/patchme.txt b/patchme.txt
+--- a/patchme.txt
++++ b/patchme.txt
+@@ -1 +1 @@
+-a
++b
+DIFF;
+$patchOut = PredefinedTools::runTool('apply_diff', [
+    'diff' => $unifiedDiff,
+    'working_directory' => $patchDir,
+    'strip' => 1,
+]);
+$patchJson = json_decode($patchOut, true);
+if (is_array($patchJson) && ($patchJson['ok'] ?? false) === true) {
+    $assert(trim((string) file_get_contents($pFile)) === 'b', 'apply_diff should apply unified diff when patch is available');
+} else {
+    $assert(is_array($patchJson), 'apply_diff should always return a JSON object describing outcome');
+}
+@unlink($pFile);
+@rmdir($patchDir);
 
 if ($failed !== 0) {
     fwrite(STDERR, "\nTests failed ({$failed} assertion(s))\n");

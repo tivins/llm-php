@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.0 — 2026-05-13
+
+- Feature: `PredefinedTools` adds `grep` (recursive plain-text / PCRE scan), `web_search` (DuckDuckGo JSON API via cURL), `apply_diff` (`patch` on PATH), `git_status`, and `run_phpunit` (invokes `PHP_BINARY` + PHPUnit script); `all()`, `getExecuteTools()`, and `runTool()` dispatch match.
+- Tests: `tests/predefined_tools_test.php` covers grep, git status in repo, missing PHPUnit path, optional web search JSON shape, and apply-diff outcomes.
+
 ## 1.5.1 — 2026-05-13
 
 - Feature: `PredefinedTools::runTool()` dispatches predefined executors and normalizes outputs for `Role::Tool` messages; `readFile` / `writeFile` now report failures honestly (`string|false`, `bool`), treat empty-path arguments as failures, preserve empty-file reads as empty strings (not failures), and use silent I/O for expected misses so tooling is not drowned in notices; `getDateTime()` accepts optional parameters for callable parity.
