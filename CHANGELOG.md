@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.7.0 — 2026-05-13
+
+- Feature: `PredefinedTools::getFetchWebPageTool()` / `fetch_web_page` — HTTP GET for http/https URLs via cURL, optional `max_bytes` cap (default 512 KiB, max 2 MiB), redirects limited to http/https; clarifies `web_search` description (DuckDuckGo summaries vs full pages).
+
 ## 1.6.0 — 2026-05-13
 
 - Feature: `PredefinedTools` adds `grep` (recursive plain-text / PCRE scan), `web_search` (DuckDuckGo JSON API via cURL), `apply_diff` (`patch` on PATH), `git_status`, and `run_phpunit` (invokes `PHP_BINARY` + PHPUnit script); `all()`, `getExecuteTools()`, and `runTool()` dispatch match.

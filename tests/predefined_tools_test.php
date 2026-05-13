@@ -59,8 +59,8 @@ $assert(
 $tools = PredefinedTools::getExecuteTools();
 $assert(isset($tools['read_file'], $tools['write_file'], $tools['get_date_time']), 'executors registry should define known tools');
 $assert(
-    isset($tools['grep'], $tools['web_search'], $tools['apply_diff'], $tools['git_status'], $tools['run_phpunit']),
-    'executors registry should define grep / web_search / apply_diff / git_status / run_phpunit',
+    isset($tools['grep'], $tools['web_search'], $tools['fetch_web_page'], $tools['apply_diff'], $tools['git_status'], $tools['run_phpunit']),
+    'executors registry should define grep / web_search / fetch_web_page / apply_diff / git_status / run_phpunit',
 );
 
 $grepDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'predefined_tools_grep_' . uniqid('', true);
@@ -101,6 +101,21 @@ $wsJson = json_decode($ws, true);
 $assert(
     is_array($wsJson) && (isset($wsJson['abstract']) || isset($wsJson['error'])),
     'web_search should return JSON with abstract or error',
+);
+
+$badFetch = PredefinedTools::runTool('fetch_web_page', ['url' => 'ftp://example.com/file']);
+$badFetchJson = json_decode($badFetch, true);
+$assert(is_array($badFetchJson) && isset($badFetchJson['error']), 'fetch_web_page should reject non-http(s) URLs');
+
+$fetchExample = PredefinedTools::runTool('fetch_web_page', ['url' => 'https://example.com/', 'max_bytes' => 8192]);
+$fetchJson = json_decode($fetchExample, true);
+$assert(
+    is_array($fetchJson)
+        && (
+            (isset($fetchJson['http_status'], $fetchJson['body']) && $fetchJson['http_status'] === 200 && str_contains((string) $fetchJson['body'], 'Example Domain'))
+            || isset($fetchJson['error'])
+        ),
+    'fetch_web_page should return example.com body or a structured network error',
 );
 
 $patchDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'predefined_tools_patch_' . uniqid('', true);

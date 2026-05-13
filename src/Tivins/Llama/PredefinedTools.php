@@ -112,7 +112,7 @@ class PredefinedTools
     {
         return new ChatFunctionTool(
             'web_search',
-            'Search the web for a short summary and related topics (DuckDuckGo instant answer API).',
+            'Search the web for summaries and instant answers via DuckDuckGo JSON API (not full page HTML). Use fetch_web_page to load a specific URL.',
             [
                 'type' => 'object',
                 'properties' => [
@@ -122,6 +122,30 @@ class PredefinedTools
                     ],
                 ],
                 'required' => ['query'],
+                'additionalProperties' => false,
+            ],
+        );
+    }
+
+    public static function getFetchWebPageTool(): ChatFunctionTool
+    {
+        return new ChatFunctionTool(
+            'fetch_web_page',
+            'Fetch a document over HTTP GET only (http/https). Response body may be truncated to stay within max_bytes.',
+            [
+                'type' => 'object',
+                'properties' => [
+                    'url' => [
+                        'type' => 'string',
+                        'description' => 'Absolute URL (http or https).',
+                    ],
+                    'max_bytes' => [
+                        'type' => 'integer',
+                        'description' => 'Maximum bytes of body to retain (default 524288, min 1024, max 2097152).',
+                        'default' => 524288,
+                    ],
+                ],
+                'required' => ['url'],
                 'additionalProperties' => false,
             ],
         );
@@ -211,6 +235,7 @@ class PredefinedTools
             'get_date_time' => self::getDateTimeTool(),
             'grep' => self::getGrepTool(),
             'web_search' => self::getWebSearchTool(),
+            'fetch_web_page' => self::getFetchWebPageTool(),
             'apply_diff' => self::getApplyDiffTool(),
             'git_status' => self::getGitStatusTool(),
             'run_phpunit' => self::getRunPhpUnitTool(),
@@ -228,6 +253,7 @@ class PredefinedTools
             'get_date_time' => static fn (array $_): string => self::getDateTime(),
             'grep' => static fn (array $parameters): array => self::grep($parameters),
             'web_search' => static fn (array $parameters): array => self::webSearch($parameters),
+            'fetch_web_page' => static fn (array $parameters): array => self::fetchWebPage($parameters),
             'apply_diff' => static fn (array $parameters): array => self::applyDiff($parameters),
             'git_status' => static fn (array $parameters): array => self::gitStatus($parameters),
             'run_phpunit' => static fn (array $parameters): array => self::runPhpUnit($parameters),
@@ -480,6 +506,91 @@ class PredefinedTools
             'related_topics' => self::flattenDdgTopics($decoded['RelatedTopics'] ?? []),
             'answer' => (string) ($decoded['Answer'] ?? ''),
             'http_status' => $code,
+        ];
+    }
+
+    /**
+     * HTTP GET only; schemes limited to http/https; response body length is capped by the max_bytes parameter.
+     *
+     * @return array<string, mixed>
+     */
+    public static function fetchWebPage(array $parameters): array
+    {
+        $url = $parameters['url'] ?? '';
+        if (!is_string($url) || $url === '') {
+            return ['error' => 'url must be a non-empty string'];
+        }
+
+        $parts = parse_url($url);
+        if ($parts === false || !isset($parts['scheme'], $parts['host'])) {
+            return ['error' => 'invalid URL'];
+        }
+
+        $scheme = strtolower((string) $parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return ['error' => 'only http and https URLs are allowed'];
+        }
+
+        $maxBytes = isset($parameters['max_bytes']) ? (int) $parameters['max_bytes'] : 524_288;
+        $maxBytes = max(1024, min(2 * 1024 * 1024, $maxBytes));
+
+        $body = '';
+        $truncated = false;
+
+        $ch = curl_init($url);
+        if ($ch === false) {
+            return ['error' => 'could not initialize HTTP client'];
+        }
+
+        curl_setopt_array($ch, [
+            CURLOPT_HTTPGET => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 5,
+            CURLOPT_USERAGENT => 'tivins/llm-php (PredefinedTools; +https://github.com/tivins/llm-php)',
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_REDIR_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_ENCODING => '',
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_WRITEFUNCTION => static function ($ch, string $chunk) use (&$body, &$truncated, $maxBytes): int {
+                $len = strlen($chunk);
+                $have = strlen($body);
+                if ($have >= $maxBytes) {
+                    $truncated = true;
+
+                    return 0;
+                }
+
+                $space = $maxBytes - $have;
+                if ($len <= $space) {
+                    $body .= $chunk;
+                } else {
+                    $body .= substr($chunk, 0, $space);
+                    $truncated = true;
+                }
+
+                return $len;
+            },
+        ]);
+
+        curl_exec($ch);
+        $err = curl_error($ch);
+        $errno = curl_errno($ch);
+        $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        $effective = (string) curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+        $ctype = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        curl_close($ch);
+
+        if ($body === '' && $errno !== 0) {
+            return ['error' => $err !== '' ? $err : 'request failed', 'curl_errno' => $errno];
+        }
+
+        return [
+            'url' => $effective !== '' ? $effective : $url,
+            'http_status' => $code,
+            'content_type' => $ctype,
+            'truncated' => $truncated,
+            'body' => $body,
         ];
     }
 
