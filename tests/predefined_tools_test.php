@@ -125,10 +125,36 @@ $fetchJson = json_decode($fetchExample, true);
 $assert(
     is_array($fetchJson)
         && (
-            (isset($fetchJson['http_status'], $fetchJson['body']) && $fetchJson['http_status'] === 200 && str_contains((string) $fetchJson['body'], 'Example Domain'))
+            (
+                isset($fetchJson['http_status'], $fetchJson['body'], $fetchJson['text_extracted'])
+                && $fetchJson['http_status'] === 200
+                && str_contains((string) $fetchJson['body'], 'Example Domain')
+                && $fetchJson['text_extracted'] === true
+                && !str_contains((string) $fetchJson['body'], '<html')
+            )
             || isset($fetchJson['error'])
         ),
-    'fetch_web_page should return example.com body or a structured network error',
+    'fetch_web_page should return example.com plain-text body or a structured network error',
+);
+
+$fetchRaw = PredefinedTools::runTool('fetch_web_page', [
+    'url' => 'https://example.com/',
+    'max_bytes' => 8192,
+    'raw_html' => true,
+]);
+$fetchRawJson = json_decode($fetchRaw, true);
+$assert(
+    is_array($fetchRawJson)
+        && (
+            (
+                isset($fetchRawJson['http_status'], $fetchRawJson['body'], $fetchRawJson['text_extracted'])
+                && $fetchRawJson['http_status'] === 200
+                && $fetchRawJson['text_extracted'] === false
+                && str_contains((string) $fetchRawJson['body'], '<')
+            )
+            || isset($fetchRawJson['error'])
+        ),
+    'fetch_web_page with raw_html should return markup or a structured network error',
 );
 
 $patchDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'predefined_tools_patch_' . uniqid('', true);

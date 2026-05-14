@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.11.0 — 2026-05-14
+
+- Feature: `fetch_web_page` returns **plain visible text by default** for HTML/XHTML (scripts/styles/noscript/template stripped, entities decoded, whitespace normalized); tool arg **`raw_html`** (default `false`) restores raw response bytes. Responses include boolean **`text_extracted`** indicating whether plaintext conversion ran.
+
 ## 1.10.1 — 2026-05-14
 
 - Docs: `examples/stream_web_lookup_chain.php` — même scénario que `examples/web_lookup_chain.php` avec `StreamingToolCallingLoop` et flux SSE (`chatStream()`).

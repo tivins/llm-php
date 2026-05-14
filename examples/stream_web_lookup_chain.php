@@ -66,10 +66,12 @@ $conversation->addMessage(new Message(Role::System, $systemPrompt));
 $conversation->addMessage(new Message(
     Role::User,
     <<<'USER'
-Quelle est la date de publication officielle annoncée pour PHP 8.3.0 (première version stable) ?
-Je veux la date exacte telle qu’elle figure sur php.net (pas une approximation), avec l’URL de la page où tu l’as lue et une citation courte du passage pertinent.
+Selon les sources en ligne les plus récentes, quel est le cours actuel du pétrole Brent par baril ? Veuillez indiquer la source financière qui fournit cette donnée.
 USER,
 ));
+
+//Quelle est la date de publication officielle annoncée pour PHP 8.3.0 (première version stable) ?
+//Je veux la date exacte telle qu’elle figure sur php.net (pas une approximation), avec l’URL de la page où tu l’as lue et une citation courte du passage pertinent.
 
 $options = new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto');
 
