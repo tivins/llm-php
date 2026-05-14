@@ -4,7 +4,7 @@ Goal: Run LLM inference locally on a machine with **8 GB of VRAM or more**.
 
 Stack: Llama.cpp + a lightweight model (Gemma 2 9B, Gemma 4 4B, Qwen 2.5 7B, …).
 
-Beyond exposing llama.cpp from PHP, **llm-php** adds higher-level helpers—such as "thinking"-style prompting and preset personas.
+Beyond exposing llama.cpp from PHP, **llm-php** adds higher-level helpers—such as "thinking"-style prompting, preset personas, and **configurable** tool calling: you declare tools (schemas + bound executors) and run multi-step loops until the model is done. That is not limited to ad hoc PHP callables—`PredefinedTools` ships ready-made workflows the model can drive (for example `grep`, `web_search`, `fetch_web_page`, file read/write, `apply_diff`, `git_status`, and more).
 
 
 ## Installation
@@ -40,6 +40,8 @@ Pick a [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) file th
 
 **Minimal example:**
 
+First, run llama.cpp server (run.sh, run.bat).
+
 ```php
 $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
 $conversation = new Conversation();
@@ -47,6 +49,11 @@ $conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));
 $conversation->addMessage(new Message(Role::User, 'List and briefly explain five practical habits that improve learning retention, with one short paragraph per habit (about 3–5 sentences each).'));
 $answer = trim($lama->chat($conversation));
 ```
+
+Note: This example is simplified, it does not handle exceptions and does not check whether the LLM is reachable (health).
+
+See the `examples` folder for more.
+
 
 **Sampling and generation options** (OpenAI-compatible body fields such as `temperature`, `top_p`, `max_tokens`, penalties, `seed`, `stop`, `n`) are passed via `ChatCompletionOptions` as an optional argument to `chat()`, `chatCompletions()`, and `chatStream()`. Only properties you set are sent; omitted fields keep the server defaults. See the class docblock on `ChatCompletionOptions` for parameter meanings and compatibility notes for local backends.
 
@@ -57,6 +64,3 @@ $sampler = new ChatCompletionOptions(temperature: 0.4, top_p: 0.9, max_tokens: 2
 $answer = trim($lama->chat($conversation, $sampler));
 ```
 
-Note: This example is simplified, it does not handle exceptions and does not check whether the LLM is reachable (health).
-
-See the `examples` folder for more.

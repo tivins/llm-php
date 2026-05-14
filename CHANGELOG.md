@@ -6,6 +6,10 @@
 - Refactor: `examples/tools_chain.php` and `examples/web_lookup_chain.php` delegate the tool loop to `ToolCallingLoop`.
 - Tests: `tests/tool_calling_loop_test.php` covers idle pass-through, one tool round, invalid JSON arguments, callback hook, and error handling.
 
+## 1.8.1 — 2026-05-13
+
+- Docs: README intro clarifies configurable tool calling (schemas + executors, multi-step loops) and highlights `PredefinedTools` workflows (`grep`, `web_search`, `fetch_web_page`, …), not solely custom PHP functions.
+
 ## 1.7.4 — 2026-05-13
 
 - Fix: `web_search` migrated from `api.duckduckgo.com` JSON Instant Answer API (always returned empty for most queries) to `html.duckduckgo.com/html/` HTML scraping; now returns `results[]` with `title`, `url`, `snippet` for real ranked results; adds optional `max_results` parameter (default 8, max 20); removes unused `flattenDdgTopics`.
