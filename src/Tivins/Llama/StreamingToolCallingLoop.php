@@ -15,7 +15,8 @@ use RuntimeException;
  * time while tool arguments are accumulated behind the scenes.
  *
  * Each iteration:
- *  1. Streams one completion round, calling `$onDelta` per text token.
+ *  1. Streams one completion round, calling `$onDelta` per text token and optionally `$onReasoningDelta`
+ *     per `reasoning_content` fragment when the backend supports it.
  *  2. If `finish_reason` is `"tool_calls"`, executes each tool via `$executeTool`, appends
  *     the assistant + tool messages to `$conversation`, then streams again.
  *  3. Stops when no tool calls are present in the result or `$maxRounds` is exhausted.
@@ -31,7 +32,7 @@ final class StreamingToolCallingLoop
      * @param callable(string): void                          $onDelta         Called for every text token across all rounds.
      * @param callable(string, array<string, mixed>): string  $executeTool     Dispatches a tool call; receives `($name, $args)` and returns the result string.
      * @param (callable(string, array<string, mixed>): void)|null $onToolCall  Optional observer invoked just before each tool is executed (e.g. for logging).
-     * @param (callable(int, string): void)|null              $onToolCallChunk Optional: receives `($toolIndex, $argFragment)` for live argument streaming.
+     * @param (callable(string): void)|null                     $onReasoningDelta Optional: receives each `reasoning_content` fragment ({@see Lama::chatStream()}).
      *
      * @return StreamResult Last streaming result (from the final round that contained no tool calls, or the last round when `$maxRounds` is exhausted).
      *
@@ -46,6 +47,7 @@ final class StreamingToolCallingLoop
         int $maxRounds = 16,
         ?callable $onToolCall = null,
         ?callable $onToolCallChunk = null,
+        ?callable $onReasoningDelta = null,
     ): StreamResult {
         if ($maxRounds < 1) {
             throw new RuntimeException('$maxRounds must be at least 1');
@@ -54,7 +56,7 @@ final class StreamingToolCallingLoop
         $result = null;
 
         for ($round = 0; $round < $maxRounds; $round++) {
-            $result = $this->lama->chatStream($conversation, $onDelta, $options, $onToolCallChunk);
+            $result = $this->lama->chatStream($conversation, $onDelta, $options, $onToolCallChunk, $onReasoningDelta);
 
             if (!$result->hasToolCalls()) {
                 break;

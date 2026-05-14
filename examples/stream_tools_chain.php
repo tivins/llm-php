@@ -41,21 +41,37 @@ $conversation->addMessage(new Message(
 $options = new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto');
 
 try {
+    $lastDeltaSource = '';
     $result = (new StreamingToolCallingLoop($lama))->runUntilIdle(
         conversation: $conversation,
         options: $options,
-        onDelta: static function (string $delta): void {
+        onDelta: static function (string $delta) use(&$lastDeltaSource): void {
+            if ($lastDeltaSource !== 'delta') {
+                echo "\n";
+            }
+            $lastDeltaSource = 'delta';
             echo $delta;
             flush();
         },
         executeTool: PredefinedTools::runTool(...),
         maxRounds: 16,
-        onToolCall: static function (string $name, array $args): void {
+        onToolCall: static function (string $name, array $args) use (&$lastDeltaSource): void {
             fwrite(STDERR, "\n[tool] " . $name . ' ' . json_encode($args) . "\n");
+            $lastDeltaSource = 'tool';
         },
-        onToolCallChunk: static function (int $index, string $fragment): void {
-            // Uncomment to watch argument fragments arrive in real time:
-            fwrite(STDERR, $fragment);
+        onToolCallChunk: static function (int $index, string $fragment) use (&$lastDeltaSource): void {
+            if ($lastDeltaSource !== 'tool') {
+                echo "\n";
+            }
+            fwrite(STDERR, "\e[32m$fragment\e[0m");
+            $lastDeltaSource = 'tool';
+        },
+        onReasoningDelta: static function (string $s) use (&$lastDeltaSource): void {
+            if ($lastDeltaSource !== 'reasoning') {
+                echo "\n";
+            }
+            $lastDeltaSource = 'reasoning';
+            fwrite(STDERR, "\e[33m$s\e[0m");
         },
     );
     echo PHP_EOL;

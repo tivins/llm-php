@@ -111,13 +111,19 @@ class Lama
      * Streams OpenAI-compatible SSE from POST /v1/chat/completions with stream: true.
      *
      * Invokes `$onDelta` for each non-empty text fragment in `choices[0].delta.content`.
+     * When the backend exposes chain-of-thought style output, `$onReasoningDelta` is invoked for each
+     * non-empty fragment from {@code choices[0].delta.reasoning_content}. If {@code reasoning_content}
+     * is omitted from {@code delta} entirely, falls back to {@code choices[0].message.reasoning_content}
+     * on that chunk (avoids doubling when both fields carry the same text). Concatenated reasoning is exposed
+     * as {@see StreamResult::$reasoningContent}.
      * Tool call argument fragments (when the model decides to call a function) are accumulated
      * internally and returned via {@see StreamResult::$toolCalls}; pass `$onToolCallChunk` to
      * receive live argument fragments as they arrive (useful for progress display).
      *
-     * @param callable(string): void                    $onDelta        Called for each text token.
-     * @param ChatCompletionOptions|null                $options        Sampling / tool schema options.
-     * @param (callable(int, string): void)|null        $onToolCallChunk Optional: called with (toolIndex, argFragment) for every streaming argument chunk.
+     * @param callable(string): void                    $onDelta            Called for each visible text token.
+     * @param ChatCompletionOptions|null                $options            Sampling / tool schema options.
+     * @param (callable(int, string): void)|null        $onToolCallChunk    Optional: called with (toolIndex, argFragment) for every streaming argument chunk.
+     * @param (callable(string): void)|null             $onReasoningDelta   Optional: called for each reasoning_content fragment.
      *
      * @throws JsonException
      * @throws RuntimeException
@@ -127,6 +133,7 @@ class Lama
         callable $onDelta,
         ?ChatCompletionOptions $options = null,
         ?callable $onToolCallChunk = null,
+        ?callable $onReasoningDelta = null,
     ): StreamResult {
         $url = $this->url . '/v1/chat/completions';
         $payload = $this->chatCompletionRequestBody($conversation, $options, stream: true);
@@ -134,13 +141,16 @@ class Lama
         $lineBuffer = '';
         $errorBody = '';
         $contentBuffer = '';
+        $reasoningBuffer = '';
         $toolCallsAccumulator = [];
         $finishReason = '';
 
         $processLine = function (string $line) use (
             $onDelta,
             $onToolCallChunk,
+            $onReasoningDelta,
             &$contentBuffer,
+            &$reasoningBuffer,
             &$toolCallsAccumulator,
             &$finishReason,
         ): void {
@@ -157,13 +167,44 @@ class Lama
                 return;
             }
 
-            $delta = $parsed['choices'][0]['delta']['content'] ?? null;
-            if (is_string($delta) && $delta !== '') {
-                $contentBuffer .= $delta;
-                $onDelta($delta);
+            $choice = $parsed['choices'][0] ?? null;
+            if (!is_array($choice)) {
+                return;
             }
 
-            $tcDeltas = $parsed['choices'][0]['delta']['tool_calls'] ?? null;
+            $delta = $choice['delta'] ?? null;
+            $delta = is_array($delta) ? $delta : [];
+
+            $textDelta = $delta['content'] ?? null;
+            if (is_string($textDelta) && $textDelta !== '') {
+                $contentBuffer .= $textDelta;
+                $onDelta($textDelta);
+            }
+
+            $reasoningDelta = null;
+            if (\array_key_exists('reasoning_content', $delta)) {
+                $v = $delta['reasoning_content'];
+                if (is_string($v) && $v !== '') {
+                    $reasoningDelta = $v;
+                }
+            }
+            if ($reasoningDelta === null) {
+                $msg = $choice['message'] ?? null;
+                if (is_array($msg)
+                    && isset($msg['reasoning_content'])
+                    && is_string($msg['reasoning_content'])
+                    && $msg['reasoning_content'] !== '') {
+                    $reasoningDelta = $msg['reasoning_content'];
+                }
+            }
+            if ($reasoningDelta !== null) {
+                $reasoningBuffer .= $reasoningDelta;
+                if ($onReasoningDelta !== null) {
+                    $onReasoningDelta($reasoningDelta);
+                }
+            }
+
+            $tcDeltas = $delta['tool_calls'] ?? null;
             if (is_array($tcDeltas)) {
                 foreach ($tcDeltas as $tc) {
                     if (!is_array($tc)) {
@@ -192,7 +233,7 @@ class Lama
                 }
             }
 
-            $fr = $parsed['choices'][0]['finish_reason'] ?? null;
+            $fr = $choice['finish_reason'] ?? null;
             if (is_string($fr) && $fr !== '') {
                 $finishReason = $fr;
             }
@@ -265,6 +306,7 @@ class Lama
             content: $contentBuffer,
             finishReason: $finishReason,
             toolCalls: $toolCalls,
+            reasoningContent: $reasoningBuffer,
         );
     }
 
