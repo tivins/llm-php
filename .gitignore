@@ -11,3 +11,6 @@ fr_FR-upmc-medium.onnx
 fr_FR-upmc-medium.onnx.json
 
 examples/cacert.pem
+
+
+examples/chat-*.json

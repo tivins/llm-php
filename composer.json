@@ -13,8 +13,7 @@
     },
     "authors": [
         {
-            "name": "Tivins",
-            "email": "pub.git@elabo.fr"
+            "name": "Tivins"
         }
     ],
     "minimum-stability": "stable",
