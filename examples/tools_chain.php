@@ -26,7 +26,7 @@ $conversation = new Conversation();
 $conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));
 $conversation->addMessage(new Message(
     Role::User,
-    "Read the file 'story.txt' and return only the content, without markdown formatting.",
+    "Read the file 'story.txt' and return only the content translated into French, without markdown formatting.",
 ));
 
 $options = new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto');

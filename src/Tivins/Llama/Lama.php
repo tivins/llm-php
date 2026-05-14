@@ -108,21 +108,95 @@ class Lama
     }
 
     /**
-     * Streams OpenAI-compatible SSE (Server-Sent Events) from POST /v1/chat/completions with stream: true.
-     * Invokes $onDelta for each non-empty text fragment in choices[0].delta.content.
+     * Streams OpenAI-compatible SSE from POST /v1/chat/completions with stream: true.
      *
-     * @param callable(string): void $onDelta
-     * @param ChatCompletionOptions|null $options Same sampling fields as non-streaming calls; applied to the streamed completion.
+     * Invokes `$onDelta` for each non-empty text fragment in `choices[0].delta.content`.
+     * Tool call argument fragments (when the model decides to call a function) are accumulated
+     * internally and returned via {@see StreamResult::$toolCalls}; pass `$onToolCallChunk` to
+     * receive live argument fragments as they arrive (useful for progress display).
+     *
+     * @param callable(string): void                    $onDelta        Called for each text token.
+     * @param ChatCompletionOptions|null                $options        Sampling / tool schema options.
+     * @param (callable(int, string): void)|null        $onToolCallChunk Optional: called with (toolIndex, argFragment) for every streaming argument chunk.
      *
      * @throws JsonException
+     * @throws RuntimeException
      */
-    public function chatStream(Conversation $conversation, callable $onDelta, ?ChatCompletionOptions $options = null): void
-    {
+    public function chatStream(
+        Conversation $conversation,
+        callable $onDelta,
+        ?ChatCompletionOptions $options = null,
+        ?callable $onToolCallChunk = null,
+    ): StreamResult {
         $url = $this->url . '/v1/chat/completions';
         $payload = $this->chatCompletionRequestBody($conversation, $options, stream: true);
 
         $lineBuffer = '';
         $errorBody = '';
+        $contentBuffer = '';
+        $toolCallsAccumulator = [];
+        $finishReason = '';
+
+        $processLine = function (string $line) use (
+            $onDelta,
+            $onToolCallChunk,
+            &$contentBuffer,
+            &$toolCallsAccumulator,
+            &$finishReason,
+        ): void {
+            $line = rtrim($line, "\r");
+            if ($line === '' || str_starts_with($line, ':') || !str_starts_with($line, 'data:')) {
+                return;
+            }
+            $data = trim(substr($line, strlen('data:')));
+            if ($data === '' || $data === '[DONE]') {
+                return;
+            }
+            $parsed = json_decode($data, true, 512, JSON_THROW_ON_ERROR);
+            if (!is_array($parsed)) {
+                return;
+            }
+
+            $delta = $parsed['choices'][0]['delta']['content'] ?? null;
+            if (is_string($delta) && $delta !== '') {
+                $contentBuffer .= $delta;
+                $onDelta($delta);
+            }
+
+            $tcDeltas = $parsed['choices'][0]['delta']['tool_calls'] ?? null;
+            if (is_array($tcDeltas)) {
+                foreach ($tcDeltas as $tc) {
+                    if (!is_array($tc)) {
+                        continue;
+                    }
+                    $idx = (int) ($tc['index'] ?? 0);
+                    if (!isset($toolCallsAccumulator[$idx])) {
+                        $toolCallsAccumulator[$idx] = ['id' => '', 'name' => '', 'arguments' => ''];
+                    }
+                    if (isset($tc['id']) && is_string($tc['id'])) {
+                        $toolCallsAccumulator[$idx]['id'] = $tc['id'];
+                    }
+                    $fn = $tc['function'] ?? null;
+                    if (is_array($fn)) {
+                        if (isset($fn['name']) && is_string($fn['name'])) {
+                            $toolCallsAccumulator[$idx]['name'] .= $fn['name'];
+                        }
+                        $frag = isset($fn['arguments']) && is_string($fn['arguments']) ? $fn['arguments'] : '';
+                        if ($frag !== '') {
+                            $toolCallsAccumulator[$idx]['arguments'] .= $frag;
+                            if ($onToolCallChunk !== null) {
+                                $onToolCallChunk($idx, $frag);
+                            }
+                        }
+                    }
+                }
+            }
+
+            $fr = $parsed['choices'][0]['finish_reason'] ?? null;
+            if (is_string($fr) && $fr !== '') {
+                $finishReason = $fr;
+            }
+        };
 
         $curl = curl_init();
         curl_setopt_array($curl, [
@@ -133,7 +207,7 @@ class Lama
             CURLOPT_WRITEFUNCTION => function ($ch, string $chunk) use (
                 &$lineBuffer,
                 &$errorBody,
-                $onDelta
+                $processLine,
             ): int {
                 $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 if ($code >= 400) {
@@ -146,25 +220,7 @@ class Lama
                 while (($pos = strpos($lineBuffer, "\n")) !== false) {
                     $line = substr($lineBuffer, 0, $pos);
                     $lineBuffer = substr($lineBuffer, $pos + 1);
-                    $line = rtrim($line, "\r");
-                    if ($line === '' || str_starts_with($line, ':')) {
-                        continue;
-                    }
-                    if (!str_starts_with($line, 'data:')) {
-                        continue;
-                    }
-                    $data = trim(substr($line, strlen('data:')));
-                    if ($data === '' || $data === '[DONE]') {
-                        continue;
-                    }
-                    $parsed = json_decode($data, true, 512, JSON_THROW_ON_ERROR);
-                    if (!is_array($parsed)) {
-                        continue;
-                    }
-                    $delta = $parsed['choices'][0]['delta']['content'] ?? null;
-                    if (is_string($delta) && $delta !== '') {
-                        $onDelta($delta);
-                    }
+                    $processLine($line);
                 }
 
                 return strlen($chunk);
@@ -189,20 +245,27 @@ class Lama
         }
 
         if ($lineBuffer !== '') {
-            $line = rtrim($lineBuffer, "\r");
-            if ($line !== '' && !str_starts_with($line, ':') && str_starts_with($line, 'data:')) {
-                $data = trim(substr($line, strlen('data:')));
-                if ($data !== '' && $data !== '[DONE]') {
-                    $parsed = json_decode($data, true, 512, JSON_THROW_ON_ERROR);
-                    if (is_array($parsed)) {
-                        $delta = $parsed['choices'][0]['delta']['content'] ?? null;
-                        if (is_string($delta) && $delta !== '') {
-                            $onDelta($delta);
-                        }
-                    }
-                }
-            }
+            $processLine($lineBuffer);
         }
+
+        ksort($toolCallsAccumulator);
+        $toolCalls = array_values(array_map(
+            static fn (array $entry): array => [
+                'id'       => $entry['id'],
+                'type'     => 'function',
+                'function' => [
+                    'name'      => $entry['name'],
+                    'arguments' => $entry['arguments'],
+                ],
+            ],
+            $toolCallsAccumulator,
+        ));
+
+        return new StreamResult(
+            content: $contentBuffer,
+            finishReason: $finishReason,
+            toolCalls: $toolCalls,
+        );
     }
 
     /**

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.0 — 2026-05-14
+
+- Feature: `StreamResult` value object returned by `Lama::chatStream()` — carries accumulated `content`, `finishReason`, and a reconstructed OpenAI-style `toolCalls` array.
+- Feature: `Lama::chatStream()` now accumulates `delta.tool_calls` fragments by index across SSE events, captures `finish_reason`, and returns a `StreamResult`; optional `$onToolCallChunk(int $index, string $fragment)` callback delivers argument fragments in real time. Return type changed from `void` to `StreamResult` (backward-compatible when callers ignore the return value).
+- Feature: `StreamingToolCallingLoop` — streaming counterpart of `ToolCallingLoop`; drives multi-round tool use via `chatStream`, with injectable `$onDelta`, `$executeTool`, `$onToolCall`, and `$onToolCallChunk` hooks.
+- Docs: `examples/stream_tools_chain.php` — streaming tool loop using `StreamingToolCallingLoop` and `PredefinedTools`.
+
 ## 1.8.0 — 2026-05-13
 
 - Feature: `ToolCallingLoop` runs OpenAI-style multi-round tool execution (assistant replay with `tool_calls`, strict JSON argument decoding, `Role::Tool` replies, follow-up `chatCompletions`) with injectable `callable` tool executor, optional `onToolCall` / `afterRoundCompletion` hooks, and `RuntimeException` when responses lack `choices[0]`.
