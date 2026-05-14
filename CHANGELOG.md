@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.10.1 — 2026-05-14
+
+- Docs: `examples/stream_web_lookup_chain.php` — même scénario que `examples/web_lookup_chain.php` avec `StreamingToolCallingLoop` et flux SSE (`chatStream()`).
+
 ## 1.10.0 — 2026-05-14
 
 - Feature: `Lama::chatStream()` streams `choices[0].delta.reasoning_content` into `StreamResult::$reasoningContent`; optional `$onReasoningDelta(string $fragment)`. If `delta` omits `reasoning_content`, uses `choices[0].message.reasoning_content` for that chunk (avoids appending message when delta already declares the field).
