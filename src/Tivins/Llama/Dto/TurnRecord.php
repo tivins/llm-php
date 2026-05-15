@@ -17,6 +17,7 @@ use Tivins\Llama\StreamResult;
  * **JSON shape from {@see self::toLogArray()}** (all keys optional except where noted):
  * - `id` (string), `created_at` (ISO-8601), `mode` (`completion`|`stream`)
  * - `request_options` (object): snapshot from {@see ChatCompletionOptions::toRequestBody()} when provided at construction
+ * - `request_messages` (array of objects, optional): OpenAI-style `messages` snapshot sent with the request (e.g. from {@see Conversation::toChatCompletionMessages()})
  * - `raw_completion` (object): full non-stream response JSON when `mode === completion`
  * - `raw_stream` (object): `{ events: [...], raw_data_lines?: [...] }` when `mode === stream`
  * - `stream_result` (object): aggregated {@see StreamResult} fields when `mode === stream` (`content`, `finish_reason`, `tool_calls`, `reasoning_content`; when set: optional `usage`, `model`, `id`)
@@ -25,11 +26,15 @@ use Tivins\Llama\StreamResult;
  */
 final readonly class TurnRecord
 {
+    /**
+     * @param list<array<string, mixed>>|null $requestMessages Optional snapshot of chat `messages` for this request (audit/logging).
+     */
     private function __construct(
         public string $id,
         public string $createdAt,
         public string $mode,
         public ?array $requestOptions,
+        public ?array $requestMessages,
         public ?RawChatCompletionResponse $completionResponse,
         public ?RawStreamTrace $streamTrace,
         public ?StreamResult $streamResult,
@@ -57,12 +62,14 @@ final readonly class TurnRecord
         RawChatCompletionResponse $response,
         ?ChatCompletionOptions $requestOptions = null,
         ?string $createdAtIso8601 = null,
+        ?array $requestMessages = null,
     ): self {
         return new self(
             id: $id,
             createdAt: $createdAtIso8601 ?? self::nowUtc(),
             mode: 'completion',
             requestOptions: $requestOptions !== null ? $requestOptions->toRequestBody() : null,
+            requestMessages: self::normalizeRequestMessages($requestMessages),
             completionResponse: $response,
             streamTrace: null,
             streamResult: null,
@@ -75,16 +82,32 @@ final readonly class TurnRecord
         StreamResult $result,
         ?ChatCompletionOptions $requestOptions = null,
         ?string $createdAtIso8601 = null,
+        ?array $requestMessages = null,
     ): self {
         return new self(
             id: $id,
             createdAt: $createdAtIso8601 ?? self::nowUtc(),
             mode: 'stream',
             requestOptions: $requestOptions !== null ? $requestOptions->toRequestBody() : null,
+            requestMessages: self::normalizeRequestMessages($requestMessages),
             completionResponse: null,
             streamTrace: $trace,
             streamResult: $result,
         );
+    }
+
+    /**
+     * @param list<array<string, mixed>>|null $messages
+     *
+     * @return list<array<string, mixed>>|null
+     */
+    private static function normalizeRequestMessages(?array $messages): ?array
+    {
+        if ($messages === null || $messages === []) {
+            return null;
+        }
+
+        return array_values($messages);
     }
 
     /**
@@ -99,6 +122,9 @@ final readonly class TurnRecord
         ];
         if ($this->requestOptions !== null && $this->requestOptions !== []) {
             $out['request_options'] = $this->requestOptions;
+        }
+        if ($this->requestMessages !== null && $this->requestMessages !== []) {
+            $out['request_messages'] = $this->requestMessages;
         }
         if ($this->mode === 'completion') {
             $out['raw_completion'] = $this->completionResponse->toLogArray();
@@ -151,6 +177,19 @@ final readonly class TurnRecord
             $requestOptions = $data['request_options'];
         }
 
+        $requestMessages = null;
+        if (isset($data['request_messages']) && is_array($data['request_messages']) && $data['request_messages'] !== []) {
+            $parsedMessages = [];
+            foreach ($data['request_messages'] as $row) {
+                if (is_array($row)) {
+                    $parsedMessages[] = $row;
+                }
+            }
+            if ($parsedMessages !== []) {
+                $requestMessages = array_values($parsedMessages);
+            }
+        }
+
         if ($mode === 'completion') {
             $raw = $data['raw_completion'] ?? null;
             if (!is_array($raw)) {
@@ -162,6 +201,7 @@ final readonly class TurnRecord
                 createdAt: $createdAt,
                 mode: 'completion',
                 requestOptions: $requestOptions,
+                requestMessages: $requestMessages,
                 completionResponse: new RawChatCompletionResponse($raw),
                 streamTrace: null,
                 streamResult: null,
@@ -185,6 +225,7 @@ final readonly class TurnRecord
             createdAt: $createdAt,
             mode: 'stream',
             requestOptions: $requestOptions,
+            requestMessages: $requestMessages,
             completionResponse: null,
             streamTrace: $trace,
             streamResult: $result,

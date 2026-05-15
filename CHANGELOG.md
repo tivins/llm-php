@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.20.0 — 2026-05-16
+
+- Feature: optional `request_messages` on `TurnRecord` (from `Conversation::toChatCompletionMessages()` in examples) for JSONL audit logs; `HumanTurnRenderer::renderTurnRecordRequestMessages()` and replay order in `examples/replay_turn_jsonl.php`.
+
 ## 1.19.0 — 2026-05-15
 
 - Feature: `TurnRecord::fromLogArray()`, `RawStreamTrace::fromLogArray()`, `StreamEvent::fromLogArray()`, and `StreamResult::fromLogArray()` for replaying JSONL audit lines.

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 /**
  * Affiche un journal JSONL de tours assistant ({@see \Tivins\Llama\TurnJsonlLogger} / {@see \Tivins\Llama\Dto\TurnRecord})
- * dans le terminal avec couleurs (réponse, raisonnement, outils, options de requête).
+ * dans le terminal avec couleurs (messages de requête, options, réponse, raisonnement, outils).
  *
  * Usage:
  *   php examples/replay_turn_jsonl.php chemin/vers/fichier.jsonl [--sse] [--no-ansi] [--no-dividers]
@@ -285,6 +285,8 @@ try {
             ),
         );
 
+        HumanTurnRenderer::renderTurnRecordRequestMessages($record, $baseOpts);
+
         if ($record->requestOptions !== null && $record->requestOptions !== []) {
             $ro = json_encode($record->requestOptions, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             HumanTurnRenderer::fwriteNl($stdout, HumanTurnRenderer::stylize($baseOpts, 'Options de requête', '2'));
@@ -302,7 +304,7 @@ try {
             }
         }
 
-        HumanTurnRenderer::renderTurnRecord($record, $baseOpts);
+        HumanTurnRenderer::renderTurnRecord($record, $baseOpts, omitRequestMessages: true);
     }
 } finally {
     fclose($handle);

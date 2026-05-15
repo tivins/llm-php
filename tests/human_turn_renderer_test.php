@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 use Tivins\Llama\Dto\NormalizedTurnOutcome;
 use Tivins\Llama\Dto\RawChatCompletionResponse;
+use Tivins\Llama\Dto\RawStreamTrace;
 use Tivins\Llama\Dto\TurnRecord;
 use Tivins\Llama\HumanTurnRenderer;
 use Tivins\Llama\HumanTurnStreamDisplay;
@@ -102,6 +103,34 @@ $so2 = $readStream($stdout2);
 $assertContains($so2, 'replay-1', 'turn id in metadata');
 $assertContains($so2, 'mode=completion', 'mode in metadata');
 $assertContains($so2, 'Hello!', 'rendered assistant content from TurnRecord');
+
+// --- renderTurnRecordRequestMessages + omit flag on stream record ---
+
+$traceRm = new RawStreamTrace(events: [], rawDataLines: null);
+$streamRecRm = TurnRecord::forStream(
+    id: 'replay-stream-msg',
+    trace: $traceRm,
+    result: new StreamResult('Reply only', 'stop', [], ''),
+    createdAtIso8601: '2026-01-02T12:00:00+00:00',
+    requestMessages: [
+        ['role' => 'user', 'content' => 'User asks something'],
+    ],
+);
+$stdoutRm = fopen('php://memory', 'r+');
+$stderrRm = fopen('php://memory', 'r+');
+$optsRm = new RenderOptions(
+    ansiColors: false,
+    showSectionDividers: false,
+    showTurnMetadata: false,
+    stdoutStream: $stdoutRm,
+    stderrStream: $stderrRm,
+);
+HumanTurnRenderer::renderTurnRecordRequestMessages($streamRecRm, $optsRm);
+HumanTurnRenderer::renderTurnRecord($streamRecRm, $optsRm, omitRequestMessages: true);
+$soRm = $readStream($stdoutRm);
+$assertContains($soRm, 'User asks something', 'request message content in replay section');
+$assertContains($soRm, 'Reply only', 'assistant outcome still rendered when omitRequestMessages=true');
+$assert(substr_count($soRm, 'User asks something') === 1, 'request user line not duplicated');
 
 // --- renderCompletionPayload with two choices ---
 

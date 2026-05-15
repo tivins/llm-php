@@ -217,6 +217,7 @@ Requires `vendor/autoload.php` (`composer install`).
 - **`TurnJsonlLogger`** writes **one JSON object per line** from **`TurnRecord::toLogArray()`**.
 - **Non-stream:** `TurnRecord::forCompletion()` stores the full completion JSON under `raw_completion`.
 - **Stream:** `TurnRecord::forStream()` includes **`StreamResult`** fields and **`RawStreamTrace`**; when SSE capture is used, **`raw_data_lines`** holds verbatim SSE JSON strings; structured **`events`** may be empty depending on the capture path.
+- **Request context:** when examples pass **`request_messages`** (same shape as **`Conversation::toChatCompletionMessages()`**), logs include the prompt snapshot for that request; **`examples/replay_turn_jsonl.php`** prints it before options and assistant output.
 
 Treat log files as **sensitive** if they can contain user data or downstream secrets.
 

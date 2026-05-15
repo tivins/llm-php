@@ -8,7 +8,7 @@ declare(strict_types=1);
  * Streams assistant **reply** tokens to stdout and native **{@code reasoning_content}** chunks to stderr when the backend provides them ({@see \Tivins\Llama\HumanTurnStreamDisplay} + {@see example_render_options_from_env()}).
  *
  * Set {@code TIVINS_LLAMA_CONVERSATION_LOG} to a path (e.g. {@code examples/logs/chat.{session}.jsonl}) to append one JSON line per user turn:
- * each line is a {@see \Tivins\Llama\Dto\TurnRecord} in stream mode with {@see \Tivins\Llama\Dto\RawStreamTrace::$rawDataLines} holding verbatim SSE JSON payloads (event replay via {@see \Tivins\Llama\Dto\StreamEvent} is optional / empty here).
+ * each line is a {@see \Tivins\Llama\Dto\TurnRecord} in stream mode with {@code request_messages} mirroring {@see \Tivins\Llama\Conversation::toChatCompletionMessages()} for that request, and {@see \Tivins\Llama\Dto\RawStreamTrace::$rawDataLines} holding verbatim SSE JSON payloads (event replay via {@see \Tivins\Llama\Dto\StreamEvent} is optional / empty here).
  */
 
 use Tivins\Llama\BehaviorPrompts;
@@ -86,6 +86,7 @@ try {
                 trace: new RawStreamTrace(events: [], rawDataLines: array_values($capture->lines)),
                 result: $streamResult,
                 requestOptions: $opts,
+                requestMessages: $streamConv->toChatCompletionMessages(),
             ));
         }
 

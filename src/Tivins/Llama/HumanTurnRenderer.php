@@ -117,7 +117,66 @@ final class HumanTurnRenderer
         }
     }
 
-    public static function renderTurnRecord(TurnRecord $record, RenderOptions $opts): void
+    public static function renderTurnRecordRequestMessages(TurnRecord $record, RenderOptions $opts): void
+    {
+        $messages = $record->requestMessages;
+        if ($messages === null || $messages === []) {
+            return;
+        }
+
+        $stdout = $opts->stdout();
+        self::fwriteNl($stdout, '');
+        self::fwriteNl($stdout, self::stylize($opts, 'Request messages', '36;1'));
+
+        foreach ($messages as $i => $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $role = isset($row['role']) && is_string($row['role']) ? $row['role'] : '?';
+            $roleStyle = match ($role) {
+                'system' => '34;1',
+                'user' => '36;1',
+                'assistant' => '35;1',
+                'tool' => '32;1',
+                default => '1',
+            };
+
+            self::fwriteNl($stdout, '');
+            self::fwriteNl($stdout, self::stylize($opts, '[' . ($i + 1) . '] ' . $role, $roleStyle));
+
+            if (isset($row['tool_call_id']) && is_string($row['tool_call_id']) && $row['tool_call_id'] !== '') {
+                self::fwriteNl($stdout, self::stylize($opts, 'tool_call_id: ' . $row['tool_call_id'], '2'));
+            }
+            if (isset($row['name']) && is_string($row['name']) && $row['name'] !== '') {
+                self::fwriteNl($stdout, self::stylize($opts, 'name: ' . $row['name'], '2'));
+            }
+
+            if (array_key_exists('content', $row)) {
+                $c = $row['content'];
+                if ($c !== null && $c !== '') {
+                    $text = is_string($c)
+                        ? $c
+                        : (string) json_encode($c, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    self::fwriteNl($stdout, $text);
+                }
+            }
+
+            if (isset($row['reasoning_content']) && is_string($row['reasoning_content']) && $row['reasoning_content'] !== '') {
+                self::fwriteNl($stdout, self::stylize($opts, 'reasoning_content:', '33'));
+                self::fwriteNl($stdout, $row['reasoning_content']);
+            }
+
+            if (isset($row['tool_calls']) && is_array($row['tool_calls']) && $row['tool_calls'] !== []) {
+                self::fwriteNl($stdout, self::stylize($opts, 'tool_calls:', '1'));
+                $json = json_encode($row['tool_calls'], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                self::fwriteNl($stdout, $json);
+            }
+        }
+
+        self::fwriteNl($stdout, '');
+    }
+
+    public static function renderTurnRecord(TurnRecord $record, RenderOptions $opts, bool $omitRequestMessages = false): void
     {
         $stdout = $opts->stdout();
         $dim = fn (string $s): string => self::stylize($opts, $s, '2');
@@ -129,6 +188,10 @@ final class HumanTurnRenderer
                 self::stylize($opts, '[Turn log]', '35;1') . ' '
                 . $dim('id=' . $record->id . ' mode=' . $record->mode . ' at=' . $record->createdAt),
             );
+        }
+
+        if (!$omitRequestMessages) {
+            self::renderTurnRecordRequestMessages($record, $opts);
         }
 
         if ($record->mode === 'completion') {

@@ -95,7 +95,7 @@ try {
         onToolCall: $streamDisplay->onToolCall(...),
         onToolCallChunk: $streamDisplay->onToolArgumentChunk(...),
         onReasoningDelta: $streamDisplay->onReasoningDelta(...),
-        onAssistantStreamRound: static function (StreamResult $result, RawStreamTrace $trace, int $roundIdx) use ($logger, $options): void {
+        onAssistantStreamRound: static function (StreamResult $result, RawStreamTrace $trace, int $roundIdx) use ($logger, $options, $conversation): void {
             if ($logger === null) {
                 return;
             }
@@ -105,6 +105,7 @@ try {
                 trace: $trace,
                 result: $result,
                 requestOptions: $options,
+                requestMessages: $conversation->toChatCompletionMessages(),
             ));
         },
     );

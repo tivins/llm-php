@@ -109,10 +109,16 @@ $streamRecord = TurnRecord::forStream(
     result: $streamResult,
     requestOptions: null,
     createdAtIso8601: '2026-06-01T00:00:00+00:00',
+    requestMessages: [
+        ['role' => 'system', 'content' => 'You are helpful.'],
+        ['role' => 'user', 'content' => 'Hi there'],
+    ],
 );
 $streamLog = $streamRecord->toLogArray();
 json_encode($streamLog, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 $assert(($streamLog['mode'] ?? '') === 'stream', 'stream mode');
+$assert(isset($streamLog['request_messages']) && count($streamLog['request_messages']) === 2, 'request_messages in log');
+$assert(($streamLog['request_messages'][1]['content'] ?? '') === 'Hi there', 'user content in request_messages');
 $assert(isset($streamLog['raw_stream']['events']) && count($streamLog['raw_stream']['events']) === 2, 'stream events');
 $assert(($streamLog['stream_result']['finish_reason'] ?? '') === 'stop', 'stream_result finish_reason');
 $assert(($streamLog['raw_stream']['raw_data_lines'][0] ?? '') === '{"x":1}', 'raw_data_lines preserved');
