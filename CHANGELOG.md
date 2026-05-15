@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.12.1 — 2026-05-15
+
+- Fix: `apply_diff` appends a final newline to the unified diff before invoking `patch`, avoiding spurious “ends in middle of line” warnings on some GNU patch builds.
+- Success JSON: always includes **`stderr`** (cleaned) and **`warnings`** — known benign `patch` diagnostic lines are parsed out of stdout/stderr and listed in `warnings`, leaving informational stdout (e.g. `patching file …`) intact.
+- Docs: `examples/workspace_tools_demo.php` — second tour asks the model to confirm `warnings` / `stderr` in the tool response.
+
 ## 1.12.0 — 2026-05-15
 
 - Feature: `apply_diff` — normalise les fins de ligne du diff en entrée, devine une liste de niveaux `-p` (chemins type `a/b` vs noms simples), enchaîne des tentatives (`strip` peut être omis ; si fourni, ce niveau est essayé en premier puis des repli). Essaie ensuite `--ignore-whitespace` ; si une cible sur disque est en CRLF, réécrit les lignes de hunk avec `\r` avant d’autres essais.

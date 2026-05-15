@@ -189,7 +189,9 @@ class PredefinedTools
         return new ChatFunctionTool(
             'apply_diff',
             'Apply a unified diff using the patch program (must be installed and on PATH). '
-            . 'Omit strip for automatic retries (detects Git-style paths vs plain filenames; handles common CRLF/LF mismatches on Windows).',
+            . 'Omit strip for automatic retries (detects Git-style paths vs plain filenames; handles common CRLF/LF mismatches on Windows). '
+            . 'A trailing newline is appended to the diff text if missing before invoking patch. '
+            . 'On success, the JSON includes stdout, stderr (often empty), and warnings[] (non-fatal patch diagnostics parsed from those streams).',
             [
                 'type' => 'object',
                 'properties' => [
@@ -836,6 +838,7 @@ class PredefinedTools
         }
 
         $diff = str_replace(["\r\n", "\r"], "\n", $diffRaw);
+        $diff = self::ensureUnifiedDiffEndsWithNewline($diff);
 
         $real = realpath($cwd);
         if ($real === false || !is_dir($real)) {
@@ -864,7 +867,9 @@ class PredefinedTools
         ];
 
         if ($useCrlf) {
-            $crlfDiff = self::rewriteUnifiedDiffBodyForTargetNewlines($diff, "\r\n");
+            $crlfDiff = self::ensureUnifiedDiffEndsWithNewline(
+                self::rewriteUnifiedDiffBodyForTargetNewlines($diff, "\r\n"),
+            );
             $strategies[] = ['label' => 'crlf_body', 'patch' => $crlfDiff, 'args' => ['patch', '--batch', '--forward']];
             $strategies[] = [
                 'label' => 'crlf_body_ignore_ws',
@@ -887,10 +892,17 @@ class PredefinedTools
                 ];
 
                 if ($run['exit_code'] === 0) {
-                    $applied = trim($run['stdout']);
+                    $sep = self::separatePatchWarningsFromProcessOutput($run['stdout'], $run['stderr']);
+                    $applied = trim($sep['stdout']);
+                    if ($applied === '') {
+                        $applied = 'patch succeeded';
+                    }
+
                     return [
                         'ok' => true,
-                        'stdout' => $applied !== '' ? $applied : 'patch succeeded',
+                        'stdout' => $applied,
+                        'stderr' => trim($sep['stderr']),
+                        'warnings' => $sep['warnings'],
                         'strip_used' => $strip,
                         'strategy' => $strategy['label'],
                     ];
@@ -904,6 +916,66 @@ class PredefinedTools
             'stdout' => $lastReject['stdout'],
             'stderr' => $lastReject['stderr'],
             'hints' => self::patchFailureHints(),
+        ];
+    }
+
+    /**
+     * GNU patch expects unified diff stdin to end with a newline; without it, some versions print noisy warnings
+     * (e.g. "patch unexpectedly ends in middle of line") even when the patch applies.
+     */
+    private static function ensureUnifiedDiffEndsWithNewline(string $diff): string
+    {
+        if ($diff === '') {
+            return $diff;
+        }
+
+        return str_ends_with($diff, "\n") ? $diff : ($diff . "\n");
+    }
+
+    /**
+     * Exact lines emitters sometimes print to stdout or stderr that represent benign patch diagnostics.
+     *
+     * @return list<string>
+     */
+    private static function patchKnownStdoutStderrWarningLines(): array
+    {
+        return [
+            'patch unexpectedly ends in middle of line',
+        ];
+    }
+
+    /**
+     * Split process output into cleaned streams plus extracted warning lines (deduplicated from both).
+     *
+     * @return array{stdout: string, stderr: string, warnings: list<string>}
+     */
+    private static function separatePatchWarningsFromProcessOutput(string $stdout, string $stderr): array
+    {
+        $known = self::patchKnownStdoutStderrWarningLines();
+        /** @var list<string> */
+        $warnings = [];
+
+        $filterBlock = function (string $block) use ($known, &$warnings): string {
+            $norm = str_replace("\r\n", "\n", str_replace("\r", "\n", $block));
+            /** @var list<string> */
+            $kept = [];
+
+            foreach (explode("\n", $norm) as $line) {
+                if ($line !== '' && in_array($line, $known, true)) {
+                    $warnings[] = $line;
+
+                    continue;
+                }
+                $kept[] = $line;
+            }
+
+            return rtrim(implode("\n", $kept), "\n");
+        };
+
+        return [
+            'stdout' => $filterBlock($stdout),
+            'stderr' => $filterBlock($stderr),
+            'warnings' => $warnings,
         ];
     }
 

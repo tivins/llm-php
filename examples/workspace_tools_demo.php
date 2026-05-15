@@ -327,6 +327,10 @@ USER
 Toujours dans le même workspace : modifie `hello_demo.py` pour que la salutation soit « Hi, {name}! » au lieu de « Hello »,
 **uniquement** via l’outil `apply_diff` (pas `write_file`). Passe `working_directory` comme le répertoire racine du workspace
 (relève `.` ou un chemin équivalent). Après le patch, utilise `read_file` pour montrer que le fichier a bien été mis à jour.
+
+Vérifie aussi explicitement, d’après la réponse JSON renvoyée par `apply_diff`, que les champs `warnings` (tableau, souvent vide) et
+`stderr` (souvent une chaîne vide) sont présents ; résume leur contenu. Si `warnings` n’est pas vide, précise qu’il s’agit
+d’avertissements non bloquants distincts du succès (`ok`).
 USER
     );
 } catch (\Throwable $e) {

@@ -177,10 +177,31 @@ $patchOut = PredefinedTools::runTool('apply_diff', [
 $patchJson = json_decode($patchOut, true);
 if (is_array($patchJson) && ($patchJson['ok'] ?? false) === true) {
     $assert(trim((string) file_get_contents($pFile)) === 'b', 'apply_diff should apply unified diff when patch is available');
+    $assert(
+        array_key_exists('warnings', $patchJson) && is_array($patchJson['warnings']),
+        'apply_diff success should include warnings array',
+    );
+    $assert(array_key_exists('stderr', $patchJson), 'apply_diff success should include stderr string');
 } else {
     $assert(is_array($patchJson), 'apply_diff should always return a JSON object describing outcome');
 }
 @unlink($pFile);
+
+$pFileNoNl = $patchDir . DIRECTORY_SEPARATOR . 'patchme.txt';
+file_put_contents($pFileNoNl, "a\n");
+$unifiedNoTrailingNl = rtrim($unifiedDiff, "\n");
+$patchNoNlOut = json_decode((string) PredefinedTools::runTool('apply_diff', [
+    'diff' => $unifiedNoTrailingNl,
+    'working_directory' => $patchDir,
+    'strip' => 1,
+]), true);
+if (is_array($patchNoNlOut) && ($patchNoNlOut['ok'] ?? false) === true) {
+    $assert(trim((string) file_get_contents($pFileNoNl)) === 'b', 'apply_diff should normalize missing trailing newline on diff input');
+    $assert(($patchNoNlOut['warnings'] ?? null) === [], 'apply_diff should leave warnings empty when patch input is normalized');
+} else {
+    $assert(is_array($patchNoNlOut), 'apply_diff no-trailing-newline case should return JSON payload');
+}
+@unlink($pFileNoNl);
 
 $patchPlainDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'predefined_tools_patch_plain_' . uniqid('', true);
 mkdir($patchPlainDir, 0700, true);
@@ -207,6 +228,7 @@ if (is_array($bareOut) && ($bareOut['ok'] ?? false) === true) {
         isset($bareOut['strip_used'], $bareOut['strategy']),
         'apply_diff success should report strip_used and strategy',
     );
+    $assert(isset($bareOut['warnings'], $bareOut['stderr']), 'apply_diff success should include stderr and warnings');
 } else {
     $assert(is_array($bareOut), 'apply_diff bare path should return JSON payload');
 }
@@ -234,6 +256,7 @@ if (is_array($crlfOut) && ($crlfOut['ok'] ?? false) === true) {
         str_replace("\r\n", "\n", (string) file_get_contents($pCrlf)) === "b\n",
         'apply_diff should handle CRLF on-disk targets when patch is available',
     );
+    $assert(isset($crlfOut['warnings'], $crlfOut['stderr']), 'apply_diff CRLF success should include stderr and warnings');
 } else {
     $assert(is_array($crlfOut), 'apply_diff CRLF case should return JSON payload');
 }
