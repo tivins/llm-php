@@ -61,3 +61,9 @@ $sampler = new ChatCompletionOptions(temperature: 0.4, top_p: 0.9, max_tokens: 2
 $answer = trim($lama->chat($conversation, $sampler));
 ```
 
+## Tests et diagnostic stream
+
+Run unit checks with `php tests/<name>_test.php` (see `tests/*_test.php`). `tests/normalized_turn_outcome_test.php` replays a static SSE fixture (`tests/fixtures/sse_chat_stream_enriched_fixture.sse.txt`) through `ChatStreamAccumulator`, asserting aggregation of `content`, `reasoning_content`, `tool_calls`, `finish_reason`, and `usage` without a live LLM server.
+
+`tests/stream_probe.php` remains an **interactive** script (against a running local server) to classify whether a backend emits **cumulative** vs **incremental** `content` deltas. It complements, but does not replace, these OpenAI-shaped parsing fixtures; no change to `stream_probe.php` was required for Étape 4.
+

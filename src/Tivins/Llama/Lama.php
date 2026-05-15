@@ -119,6 +119,8 @@ class Lama
      * Tool call argument fragments (when the model decides to call a function) are accumulated
      * internally and returned via {@see StreamResult::$toolCalls}; pass `$onToolCallChunk` to
      * receive live argument fragments as they arrive (useful for progress display).
+     * When streamed chunks carry top-level {@code usage}, {@see StreamResult::$usage} is populated
+     * with the latest object ({@code null} when the backend omits usage on stream responses).
      *
      * @param callable(string): void                    $onDelta            Called for each visible text token.
      * @param ChatCompletionOptions|null                $options            Sampling / tool schema options.
@@ -140,104 +142,7 @@ class Lama
 
         $lineBuffer = '';
         $errorBody = '';
-        $contentBuffer = '';
-        $reasoningBuffer = '';
-        $toolCallsAccumulator = [];
-        $finishReason = '';
-
-        $processLine = function (string $line) use (
-            $onDelta,
-            $onToolCallChunk,
-            $onReasoningDelta,
-            &$contentBuffer,
-            &$reasoningBuffer,
-            &$toolCallsAccumulator,
-            &$finishReason,
-        ): void {
-            $line = rtrim($line, "\r");
-            if ($line === '' || str_starts_with($line, ':') || !str_starts_with($line, 'data:')) {
-                return;
-            }
-            $data = trim(substr($line, strlen('data:')));
-            if ($data === '' || $data === '[DONE]') {
-                return;
-            }
-            $parsed = json_decode($data, true, 512, JSON_THROW_ON_ERROR);
-            if (!is_array($parsed)) {
-                return;
-            }
-
-            $choice = $parsed['choices'][0] ?? null;
-            if (!is_array($choice)) {
-                return;
-            }
-
-            $delta = $choice['delta'] ?? null;
-            $delta = is_array($delta) ? $delta : [];
-
-            $textDelta = $delta['content'] ?? null;
-            if (is_string($textDelta) && $textDelta !== '') {
-                $contentBuffer .= $textDelta;
-                $onDelta($textDelta);
-            }
-
-            $reasoningDelta = null;
-            if (\array_key_exists('reasoning_content', $delta)) {
-                $v = $delta['reasoning_content'];
-                if (is_string($v) && $v !== '') {
-                    $reasoningDelta = $v;
-                }
-            }
-            if ($reasoningDelta === null) {
-                $msg = $choice['message'] ?? null;
-                if (is_array($msg)
-                    && isset($msg['reasoning_content'])
-                    && is_string($msg['reasoning_content'])
-                    && $msg['reasoning_content'] !== '') {
-                    $reasoningDelta = $msg['reasoning_content'];
-                }
-            }
-            if ($reasoningDelta !== null) {
-                $reasoningBuffer .= $reasoningDelta;
-                if ($onReasoningDelta !== null) {
-                    $onReasoningDelta($reasoningDelta);
-                }
-            }
-
-            $tcDeltas = $delta['tool_calls'] ?? null;
-            if (is_array($tcDeltas)) {
-                foreach ($tcDeltas as $tc) {
-                    if (!is_array($tc)) {
-                        continue;
-                    }
-                    $idx = (int) ($tc['index'] ?? 0);
-                    if (!isset($toolCallsAccumulator[$idx])) {
-                        $toolCallsAccumulator[$idx] = ['id' => '', 'name' => '', 'arguments' => ''];
-                    }
-                    if (isset($tc['id']) && is_string($tc['id'])) {
-                        $toolCallsAccumulator[$idx]['id'] = $tc['id'];
-                    }
-                    $fn = $tc['function'] ?? null;
-                    if (is_array($fn)) {
-                        if (isset($fn['name']) && is_string($fn['name'])) {
-                            $toolCallsAccumulator[$idx]['name'] .= $fn['name'];
-                        }
-                        $frag = isset($fn['arguments']) && is_string($fn['arguments']) ? $fn['arguments'] : '';
-                        if ($frag !== '') {
-                            $toolCallsAccumulator[$idx]['arguments'] .= $frag;
-                            if ($onToolCallChunk !== null) {
-                                $onToolCallChunk($idx, $frag);
-                            }
-                        }
-                    }
-                }
-            }
-
-            $fr = $choice['finish_reason'] ?? null;
-            if (is_string($fr) && $fr !== '') {
-                $finishReason = $fr;
-            }
-        };
+        $accumulator = new ChatStreamAccumulator($onDelta, $onToolCallChunk, $onReasoningDelta);
 
         $curl = curl_init();
         curl_setopt_array($curl, [
@@ -248,7 +153,7 @@ class Lama
             CURLOPT_WRITEFUNCTION => function ($ch, string $chunk) use (
                 &$lineBuffer,
                 &$errorBody,
-                $processLine,
+                $accumulator,
             ): int {
                 $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 if ($code >= 400) {
@@ -261,7 +166,7 @@ class Lama
                 while (($pos = strpos($lineBuffer, "\n")) !== false) {
                     $line = substr($lineBuffer, 0, $pos);
                     $lineBuffer = substr($lineBuffer, $pos + 1);
-                    $processLine($line);
+                    $accumulator->feedLine($line);
                 }
 
                 return strlen($chunk);
@@ -286,28 +191,10 @@ class Lama
         }
 
         if ($lineBuffer !== '') {
-            $processLine($lineBuffer);
+            $accumulator->feedLine($lineBuffer);
         }
 
-        ksort($toolCallsAccumulator);
-        $toolCalls = array_values(array_map(
-            static fn (array $entry): array => [
-                'id'       => $entry['id'],
-                'type'     => 'function',
-                'function' => [
-                    'name'      => $entry['name'],
-                    'arguments' => $entry['arguments'],
-                ],
-            ],
-            $toolCallsAccumulator,
-        ));
-
-        return new StreamResult(
-            content: $contentBuffer,
-            finishReason: $finishReason,
-            toolCalls: $toolCalls,
-            reasoningContent: $reasoningBuffer,
-        );
+        return $accumulator->buildResult();
     }
 
     /**

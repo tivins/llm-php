@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.16.0 — 2026-05-15
+
+- Feature: `Dto\NormalizedTurnOutcome` — unified turn fields from non-stream chat completions (`fromChatCompletionArray()`) or streaming (`fromStreamResult()`, optional `usage` override).
+- Feature: `ChatStreamAccumulator` parses `data:` SSE lines into `StreamResult` (shared with `Lama::chatStream()`), so tests and tools can replay fixtures without HTTP.
+- Feature: `StreamResult` optional `$usage`, `$model`, and `$id` when backends send them on stream chunks (remain `null` when omitted; `usage` shape is backend-specific).
+- Feature: `TurnRecord::toLogArray()` includes `stream_result.usage` / `model` / `id` when set.
+- Tests: `tests/normalized_turn_outcome_test.php`; fixture `tests/fixtures/sse_chat_stream_enriched_fixture.sse.txt`.
+
 ## 1.15.0 — 2026-05-15
 
 - Feature: `Message` accepts optional native assistant `reasoning_content` (`Message::$reasoningContent`); `Message::normalizeReasoningContent()` treats `null` and `''` as absent for JSON output.

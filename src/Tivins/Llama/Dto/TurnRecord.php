@@ -19,7 +19,7 @@ use Tivins\Llama\StreamResult;
  * - `request_options` (object): snapshot from {@see ChatCompletionOptions::toRequestBody()} when provided at construction
  * - `raw_completion` (object): full non-stream response JSON when `mode === completion`
  * - `raw_stream` (object): `{ events: [...], raw_data_lines?: [...] }` when `mode === stream`
- * - `stream_result` (object): aggregated {@see StreamResult} fields when `mode === stream`
+ * - `stream_result` (object): aggregated {@see StreamResult} fields when `mode === stream` (`content`, `finish_reason`, `tool_calls`, `reasoning_content`; when set: optional `usage`, `model`, `id`)
  */
 final readonly class TurnRecord
 {
@@ -108,6 +108,15 @@ final readonly class TurnRecord
                 'tool_calls' => $this->streamResult->toolCalls,
                 'reasoning_content' => $this->streamResult->reasoningContent,
             ];
+            if ($this->streamResult->usage !== null) {
+                $out['stream_result']['usage'] = $this->streamResult->usage;
+            }
+            if ($this->streamResult->model !== null) {
+                $out['stream_result']['model'] = $this->streamResult->model;
+            }
+            if ($this->streamResult->id !== null) {
+                $out['stream_result']['id'] = $this->streamResult->id;
+            }
         }
 
         return $out;

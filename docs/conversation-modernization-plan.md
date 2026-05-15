@@ -178,6 +178,8 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 
 **Objectif** : une seule structure **`NormalizedTurnOutcome`** (nom indicatif) dérivée du brut, utilisable pour affichage humain et pour compléter `TurnRecord`, sans que chaque exemple re-parse à la main.
 
+**Implémentation (2026-05-15)** : `src/Tivins/Llama/Dto/NormalizedTurnOutcome.php` avec `fromChatCompletionArray()` et `fromStreamResult(StreamResult, ?array usage)` (le paramètre `usage` surcharge `StreamResult::$usage` quand fourni). Parsing SSE factorisé dans `ChatStreamAccumulator` (utilisé par `Lama::chatStream()` et les tests). **`StreamResult`** inclut `usage`, `model`, `id` optionnels alimentés par le **dernier** chunk JSON qui les expose (forme `usage` variable selon backend). **`TurnRecord::toLogArray()`** reflète ces champs sur `stream_result` lorsqu’ils sont non nuls. Fixture SSE : `tests/fixtures/sse_chat_stream_enriched_fixture.sse.txt`. Bump **1.16.0**.
+
 ### 4.1 Contenu suggéré de `NormalizedTurnOutcome`
 
 - `content: string`
@@ -197,10 +199,12 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 
 - Si décision Étape 0 : parser les événements SSE qui portent `usage` et les agréger dans `StreamResult` **ou** dans `TurnRecord` uniquement — **étendre `StreamResult`** avec `public ?array $usage = null` seulement si c’est stable pour tous les backends ; sinon garder `usage` uniquement dans la trace brute et dans `NormalizedTurnOutcome`.
 
+**Décision Étape 4** : **`StreamResult::$usage`** (et `model` / `id` lorsque présents sur les chunks) est rempli depuis le dernier événement JSON qui expose ces clés ; la valeur demeure **`null`** tant que le backend ne les envoie pas — la **forme du tableau `usage`** n’est pas normalisée (même stratégie que le JSON brut). `NormalizedTurnOutcome::fromStreamResult()` lit ces champs par défaut avec possibilité de surcharge explicite de `usage`. La trace brute `RawStreamTrace` reste le lieu des événements finement typés lorsque nécessaire (étapes ultérieures).
+
 **Validation**
 
-- [ ] Tests avec fixtures SSE (fichiers dans `tests/fixtures/` ou chaînes inline) couvrant : deltas `content`, `reasoning_content`, `tool_calls` fragments, `finish_reason`, éventuellement `usage`.
-- [ ] Comparaison ou contrat clair avec `tests/stream_probe.php` si utilisé en manuel — documenter dans README ou dans ce plan si le probe doit être mis à jour.
+- [x] Tests avec fixtures SSE (fichiers dans `tests/fixtures/` ou chaînes inline) couvrant : deltas `content`, `reasoning_content`, `tool_calls` fragments, `finish_reason`, éventuellement `usage`.
+- [x] Comparaison ou contrat clair avec `tests/stream_probe.php` si utilisé en manuel — documenter dans README ou dans ce plan si le probe doit être mis à jour.
 
 **Critère de passage** : une seule fonction de normalisation utilisée par les futurs exemples ; pas de duplication de logique entre stream et completion dans les scripts.
 
@@ -317,7 +321,7 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 | 1 | ☑ Terminé | DTO `src/Tivins/Llama/Dto/` ; `tests/turn_record_test.php` + fixtures JSON |
 | 2 | ☑ Terminé | Correction historique assistant final + erreur si `maxRounds` trop bas ; bump 1.14.0 |
 | 3 | ☑ Terminé | `reasoning_content` sur `Message` + sérialisation ; boucles outils ; bump 1.15.0 |
-| 4 | ☐ Non démarré | |
+| 4 | ☑ Terminé | `NormalizedTurnOutcome` + `ChatStreamAccumulator` ; `StreamResult` usage/model/id ; tests + fixture SSE ; bump 1.16.0 |
 | 5 | ☐ Non démarré | |
 | 6 | ☐ Non démarré | |
 | 7 | ☐ Non démarré | |
@@ -328,5 +332,5 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 
 - **Format fichier exemples** : **JSONL** (une ligne = un événement ou un tour, selon convention choisie à l’étape 5).  
   - **JSON array** : réservé aux scripts très courts qui réécrivent tout le fichier à chaque tour ; pas le format par défaut du projet.
-- **`usage` en stream** : **pas de décision d’implémentation à l’étape 0** — analyse et éventuel parsing reportés à **l’étape 4** (cf. § 4.3 du plan), selon stabilité inter-backends.
+- **`usage` en stream** : **étape 4** — voir § 4.3 et « Décision Étape 4 » : dernier chunk avec `usage` → `StreamResult::$usage` (nullable ; forme brute) ; surcharge possible via `NormalizedTurnOutcome::fromStreamResult(..., $usage)`.
 - **Emplacement logs exemples** : **`examples/logs/`** (à ajouter au `.gitignore` à l’étape 5 ; fichiers nommés explicitement dans les exemples, ex. `*.session.jsonl` si utile).
