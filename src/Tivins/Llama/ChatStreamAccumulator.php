@@ -8,6 +8,8 @@ namespace Tivins\Llama;
  * Parses OpenAI-style chat completion SSE {@code data: {...}} lines into a {@see StreamResult}.
  *
  * Used by {@see Lama::chatStream()} and test fixtures; keeps stream parsing in one place.
+ *
+ * Pass {@see SsePayloadCapture} as the fourth constructor argument to record verbatim JSON payload strings from each parsed {@code data:} line into {@see SsePayloadCapture::$lines}.
  */
 final class ChatStreamAccumulator
 {
@@ -36,6 +38,7 @@ final class ChatStreamAccumulator
         private $onDelta,
         private $onToolCallChunk = null,
         private $onReasoningDelta = null,
+        private readonly ?SsePayloadCapture $ssePayloadCapture = null,
     ) {
     }
 
@@ -55,6 +58,10 @@ final class ChatStreamAccumulator
         $parsed = json_decode($data, true, 512, JSON_THROW_ON_ERROR);
         if (!is_array($parsed)) {
             return;
+        }
+
+        if ($this->ssePayloadCapture !== null) {
+            $this->ssePayloadCapture->lines[] = $data;
         }
 
         if (isset($parsed['usage']) && is_array($parsed['usage'])) {

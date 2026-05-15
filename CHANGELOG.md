@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.17.1 — 2026-05-15
+
+- Examples: `examples/.env` with default `TIVINS_LLAMA_CONVERSATION_LOG`, loaded from `examples/_helpers.php` via `example_load_examples_env_file()` (does not override an already-set environment variable).
+- Tests: `tests/examples_env_loader_test.php`.
+
+## 1.17.0 — 2026-05-15
+
+- Feature: `TurnJsonlLogger` appends JSONL lines from `TurnRecord::toLogArray()`; `SsePayloadCapture` collects verbatim SSE JSON payloads for `RawStreamTrace` when using `Lama::chatStream()`.
+- Feature: optional `StreamingToolCallingLoop::runUntilIdle(..., $onAssistantStreamRound)` for per-round stream logging; `ChatStreamAccumulator` accepts optional `SsePayloadCapture`.
+- Examples: optional `TIVINS_LLAMA_CONVERSATION_LOG` (see `examples/_helpers.php`) wired in `chat.php`, tool chain demos, and web lookup demos; `.gitignore` covers `examples/logs/` and `*.session.jsonl`.
+- Tests: `tests/turn_jsonl_logger_test.php`; SSE capture assertion in `tests/normalized_turn_outcome_test.php`; streaming loop callback coverage in `tests/tool_calling_loop_test.php`.
+
 ## 1.16.0 — 2026-05-15
 
 - Feature: `Dto\NormalizedTurnOutcome` — unified turn fields from non-stream chat completions (`fromChatCompletionArray()`) or streaming (`fromStreamResult()`, optional `usage` override).

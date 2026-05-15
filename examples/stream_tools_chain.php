@@ -9,6 +9,8 @@ declare(strict_types=1);
  * Mirrors examples/tools_chain.php but uses {@see \Tivins\Llama\StreamingToolCallingLoop}
  * with {@see \Tivins\Llama\Lama::chatStream()} instead of non-streaming completions.
  *
+ * Optional JSONL via {@code TIVINS_LLAMA_CONVERSATION_LOG}: one line per streamed assistant round (each {@see Lama::chatStream()} completion before tool execution splits), same notion as {@code examples/tools_chain.php} rounds — see {@see example_turn_jsonl_logger_from_env()} in {@code examples/_helpers.php}.
+ *
  * Usage: php examples/stream_tools_chain.php
  */
 
@@ -16,13 +18,17 @@ use Tivins\Llama\BehaviorPrompts;
 use Tivins\Llama\ChatCompletionOptions;
 use Tivins\Llama\ChatFunctionTool;
 use Tivins\Llama\Conversation;
+use Tivins\Llama\Dto\RawStreamTrace;
+use Tivins\Llama\Dto\TurnRecord;
 use Tivins\Llama\Lama;
 use Tivins\Llama\Message;
 use Tivins\Llama\PredefinedTools;
 use Tivins\Llama\Role;
+use Tivins\Llama\StreamResult;
 use Tivins\Llama\StreamingToolCallingLoop;
 
 require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/_helpers.php';
 
 $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
 
@@ -36,6 +42,8 @@ $conversation->addMessage(new Message(
 ));
 
 $options = new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto');
+
+$logger = example_turn_jsonl_logger_from_env();
 
 try {
     $lastDeltaSource = '';
@@ -69,6 +77,18 @@ try {
             }
             $lastDeltaSource = 'reasoning';
             fwrite(STDERR, "\e[33m$s\e[0m");
+        },
+        onAssistantStreamRound: static function (StreamResult $result, RawStreamTrace $trace, int $roundIdx) use ($logger, $options): void {
+            if ($logger === null) {
+                return;
+            }
+            $turnId = $result->id ?? uniqid('stream_round_', true);
+            $logger->logTurn(TurnRecord::forStream(
+                id: $turnId . '-round-' . $roundIdx,
+                trace: $trace,
+                result: $result,
+                requestOptions: $options,
+            ));
         },
     );
     echo PHP_EOL;

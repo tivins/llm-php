@@ -126,6 +126,7 @@ class Lama
      * @param ChatCompletionOptions|null                $options            Sampling / tool schema options.
      * @param (callable(int, string): void)|null        $onToolCallChunk    Optional: called with (toolIndex, argFragment) for every streaming argument chunk.
      * @param (callable(string): void)|null             $onReasoningDelta   Optional: called for each reasoning_content fragment.
+     * @param SsePayloadCapture|null                     $captureSsePayloads When non-null, each successfully parsed {@code data:} JSON payload string is appended for {@see \Tivins\Llama\Dto\RawStreamTrace} logs (fine-grained {@see \Tivins\Llama\Dto\StreamEvent} replay stays optional).
      *
      * @throws JsonException
      * @throws RuntimeException
@@ -136,13 +137,14 @@ class Lama
         ?ChatCompletionOptions $options = null,
         ?callable $onToolCallChunk = null,
         ?callable $onReasoningDelta = null,
+        ?SsePayloadCapture $captureSsePayloads = null,
     ): StreamResult {
         $url = $this->url . '/v1/chat/completions';
         $payload = $this->chatCompletionRequestBody($conversation, $options, stream: true);
 
         $lineBuffer = '';
         $errorBody = '';
-        $accumulator = new ChatStreamAccumulator($onDelta, $onToolCallChunk, $onReasoningDelta);
+        $accumulator = new ChatStreamAccumulator($onDelta, $onToolCallChunk, $onReasoningDelta, $captureSsePayloads);
 
         $curl = curl_init();
         curl_setopt_array($curl, [

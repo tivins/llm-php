@@ -19,6 +19,8 @@ declare(strict_types=1);
  *   `putenv('TIVINS_LLAMA_CURL_WINDOWS_NATIVE_CA=1');` pour préférer le magasin Windows (ignore ce PEM).
  * — Sinon : concaténez la CA interne dans le PEM, ou `PredefinedTools::setHttpSslVerifyPeer(false)` hors prod.
  *
+ * Journal JSONL (optionnel) : {@code TIVINS_LLAMA_CONVERSATION_LOG} — une ligne par tour assistant stream (voir {@see example_turn_jsonl_logger_from_env()} dans {@code examples/_helpers.php}).
+ *
  * Usage: php examples/stream_web_lookup_chain.php
  */
 
@@ -26,13 +28,17 @@ use Tivins\Llama\BehaviorPrompts;
 use Tivins\Llama\ChatCompletionOptions;
 use Tivins\Llama\ChatFunctionTool;
 use Tivins\Llama\Conversation;
+use Tivins\Llama\Dto\RawStreamTrace;
+use Tivins\Llama\Dto\TurnRecord;
 use Tivins\Llama\Lama;
 use Tivins\Llama\Message;
 use Tivins\Llama\PredefinedTools;
 use Tivins\Llama\Role;
+use Tivins\Llama\StreamResult;
 use Tivins\Llama\StreamingToolCallingLoop;
 
 require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/_helpers.php';
 
 // Décommentez si nécessaire (voir docblock ci‑dessus) :
 // putenv('TIVINS_LLAMA_CURL_WINDOWS_NATIVE_CA=1'); // inspection TLS entreprise + cacert.pem inadapté
@@ -72,6 +78,8 @@ USER,
 
 $options = new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto');
 
+$logger = example_turn_jsonl_logger_from_env();
+
 try {
     $lastDeltaSource = '';
     (new StreamingToolCallingLoop($lama))->runUntilIdle(
@@ -104,6 +112,18 @@ try {
             }
             $lastDeltaSource = 'reasoning';
             fwrite(STDERR, "\e[33m$s\e[0m");
+        },
+        onAssistantStreamRound: static function (StreamResult $result, RawStreamTrace $trace, int $roundIdx) use ($logger, $options): void {
+            if ($logger === null) {
+                return;
+            }
+            $turnId = $result->id ?? uniqid('stream_round_', true);
+            $logger->logTurn(TurnRecord::forStream(
+                id: $turnId . '-round-' . $roundIdx,
+                trace: $trace,
+                result: $result,
+                requestOptions: $options,
+            ));
         },
     );
     echo PHP_EOL;

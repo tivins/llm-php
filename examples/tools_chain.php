@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+/**
+ * Non-stream tool calling demo. Optional JSONL log via {@code TIVINS_LLAMA_CONVERSATION_LOG} (see {@see example_turn_jsonl_logger_from_env()} in {@code examples/_helpers.php}): one line per assistant HTTP completion round (initial + each post-tool completion).
+ */
+
 use Tivins\Llama\BehaviorPrompts;
 use Tivins\Llama\ChatCompletionOptions;
 use Tivins\Llama\ChatFunctionTool;
@@ -34,6 +38,10 @@ if ($output === null || !isset($output['choices'][0])) {
 }
 print_output($output);
 
+$logger = example_turn_jsonl_logger_from_env();
+$roundIdx = 0;
+example_log_completion_turn($logger, $output, $options, $roundIdx++);
+
 try {
     $output = (new ToolCallingLoop($lama))->runUntilIdle(
         $conversation,
@@ -44,7 +52,10 @@ try {
         static function (string $name, array $args): void {
             echo 'Tool call: ' . $name . ' with args: ' . json_encode($args) . "\n";
         },
-        print_output(...),
+        static function (array $followUp) use ($logger, $options, &$roundIdx): void {
+            print_output($followUp);
+            example_log_completion_turn($logger, $followUp, $options, $roundIdx++);
+        },
     );
 } catch (\RuntimeException $e) {
     fwrite(STDERR, $e->getMessage() . "\n");

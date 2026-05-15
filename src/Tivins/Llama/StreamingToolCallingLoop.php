@@ -6,6 +6,7 @@ namespace Tivins\Llama;
 
 use JsonException;
 use RuntimeException;
+use Tivins\Llama\Dto\RawStreamTrace;
 
 /**
  * Streaming counterpart of {@see ToolCallingLoop}.
@@ -38,6 +39,7 @@ final class StreamingToolCallingLoop
      * @param callable(string, array<string, mixed>): string  $executeTool     Dispatches a tool call; receives `($name, $args)` and returns the result string.
      * @param (callable(string, array<string, mixed>): void)|null $onToolCall  Optional observer invoked just before each tool is executed (e.g. for logging).
      * @param (callable(string): void)|null                     $onReasoningDelta Optional: receives each `reasoning_content` fragment ({@see Lama::chatStream()}).
+     * @param (callable(StreamResult, RawStreamTrace, int): void)|null $onAssistantStreamRound Invoked after each completed assistant stream round with aggregated {@see StreamResult}, a trace whose {@see RawStreamTrace::$events} may be empty and {@see RawStreamTrace::$rawDataLines} holds captured SSE JSON payloads when supported, and the zero-based loop index.
      *
      * @return StreamResult Last streaming result (final round with no tool calls).
      *
@@ -54,6 +56,7 @@ final class StreamingToolCallingLoop
         ?callable $onToolCall = null,
         ?callable $onToolCallChunk = null,
         ?callable $onReasoningDelta = null,
+        ?callable $onAssistantStreamRound = null,
     ): StreamResult {
         if ($maxRounds < 1) {
             throw new RuntimeException('$maxRounds must be at least 1');
@@ -62,7 +65,12 @@ final class StreamingToolCallingLoop
         $result = null;
 
         for ($round = 0; $round < $maxRounds; $round++) {
-            $result = $this->lama->chatStream($conversation, $onDelta, $options, $onToolCallChunk, $onReasoningDelta);
+            $capture = $onAssistantStreamRound !== null ? new SsePayloadCapture() : null;
+            $result = $this->lama->chatStream($conversation, $onDelta, $options, $onToolCallChunk, $onReasoningDelta, $capture);
+            if ($onAssistantStreamRound !== null && $capture !== null) {
+                $trace = new RawStreamTrace(events: [], rawDataLines: array_values($capture->lines));
+                $onAssistantStreamRound($result, $trace, $round);
+            }
 
             if (!$result->hasToolCalls()) {
                 break;

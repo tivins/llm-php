@@ -10,9 +10,11 @@ declare(strict_types=1);
 
 use Tivins\Llama\ChatCompletionOptions;
 use Tivins\Llama\Conversation;
+use Tivins\Llama\Dto\RawStreamTrace;
 use Tivins\Llama\Lama;
 use Tivins\Llama\Message;
 use Tivins\Llama\Role;
+use Tivins\Llama\SsePayloadCapture;
 use Tivins\Llama\StreamResult;
 use Tivins\Llama\StreamingToolCallingLoop;
 use Tivins\Llama\ToolCallingLoop;
@@ -81,6 +83,7 @@ final class FakeStreamLama extends Lama
         ?ChatCompletionOptions $options = null,
         ?callable $onToolCallChunk = null,
         ?callable $onReasoningDelta = null,
+        ?SsePayloadCapture $captureSsePayloads = null,
     ): StreamResult {
         if ($this->index >= count($this->results)) {
             throw new RuntimeException('FakeStreamLama: no more scripted stream results');
@@ -305,7 +308,26 @@ try {
 }
 $assert($threwS9, 'streaming throws when exhausted with tool_calls');
 
-// 10) Missing choices throws
+// 11) onAssistantStreamRound once per streamed assistant round (indices 0..n)
+$streamRoundCb = [];
+$rToolsCb = new StreamResult('', 'tool_calls', toolCalls: $toolCalls);
+$rFinalCb = new StreamResult('done', 'stop');
+$convS11 = new Conversation();
+$convS11->addMessage(new Message(Role::User, 'compute'));
+$loops11 = new StreamingToolCallingLoop(new FakeStreamLama([$rToolsCb, $rFinalCb]));
+$loops11->runUntilIdle(
+    $convS11,
+    null,
+    static function (string $_): void {},
+    static fn (): string => '0',
+    maxRounds: 16,
+    onAssistantStreamRound: static function (StreamResult $_r, RawStreamTrace $_t, int $idx) use (&$streamRoundCb): void {
+        $streamRoundCb[] = $idx;
+    },
+);
+$assert($streamRoundCb === [0, 1], 'onAssistantStreamRound indices');
+
+// 12) Missing choices throws
 try {
     (new ToolCallingLoop(new FakeLama([])))->runUntilIdle(
         new Conversation(),

@@ -13,6 +13,8 @@ declare(strict_types=1);
  * - **`patch` sur le PATH** (requis pour `apply_diff`). Sous Windows hors Git Bash/WSL, `patch` est souvent absent :
  *   le script quitte avec un message invitant à utiliser Git Bash, WSL ou à ajouter `patch` au PATH.
  *
+ * Journal JSONL (optionnel) : définir {@code TIVINS_LLAMA_CONVERSATION_LOG} vers un fichier — une ligne par réponse assistant HTTP (voir {@see example_turn_jsonl_logger_from_env()} dans {@code examples/_helpers.php}).
+ *
  * Usage : `php examples/workspace_tools_demo.php /chemin/vers/workspace`
  */
 
@@ -265,6 +267,8 @@ $executeTool = make_workspace_tool_executor($workspaceReal);
 
 $options = new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto');
 
+$logger = example_turn_jsonl_logger_from_env();
+
 $conversation = new Conversation();
 $conversation->addMessage(new Message(Role::System, $systemPrompt));
 
@@ -273,6 +277,7 @@ $runTurn = static function (string $userMessage) use (
     $conversation,
     $options,
     $executeTool,
+    $logger,
 ): void {
     $conversation->addMessage(new Message(Role::User, $userMessage));
 
@@ -284,6 +289,9 @@ $runTurn = static function (string $userMessage) use (
 
     print_output($output);
 
+    $roundIdx = 0;
+    example_log_completion_turn($logger, $output, $options, $roundIdx++);
+
     try {
         $output = (new ToolCallingLoop($lama))->runUntilIdle(
             $conversation,
@@ -294,7 +302,10 @@ $runTurn = static function (string $userMessage) use (
             static function (string $name, array $args): void {
                 fwrite(STDERR, '[tool] ' . $name . ' ' . json_encode($args, JSON_UNESCAPED_UNICODE) . "\n");
             },
-            print_output(...),
+            static function (array $followUp) use ($logger, $options, &$roundIdx): void {
+                print_output($followUp);
+                example_log_completion_turn($logger, $followUp, $options, $roundIdx++);
+            },
         );
     } catch (\RuntimeException $e) {
         fwrite(STDERR, $e->getMessage() . "\n");

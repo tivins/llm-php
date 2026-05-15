@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 use Tivins\Llama\ChatStreamAccumulator;
 use Tivins\Llama\Dto\NormalizedTurnOutcome;
+use Tivins\Llama\SsePayloadCapture;
 use Tivins\Llama\StreamResult;
 
 require __DIR__ . '/../vendor/autoload.php';
@@ -78,6 +79,7 @@ $assert($sseRaw !== false, 'SSE fixture readable');
 $contentSeen = '';
 $reasSeen = '';
 $chunks = [];
+$captureFixture = new SsePayloadCapture();
 $accum = new ChatStreamAccumulator(
     onDelta: static function (string $f) use (&$contentSeen): void {
         $contentSeen .= $f;
@@ -88,6 +90,7 @@ $accum = new ChatStreamAccumulator(
     onReasoningDelta: static function (string $f) use (&$reasSeen): void {
         $reasSeen .= $f;
     },
+    ssePayloadCapture: $captureFixture,
 );
 $sseNormalized = str_replace(["\r\n", "\r"], "\n", (string) $sseRaw);
 foreach (explode("\n", $sseNormalized) as $line) {
@@ -105,6 +108,7 @@ $assert($result->id === 'sse-fix-1', 'SSE id');
 $assert(count($result->toolCalls) === 1, 'SSE tool_calls count');
 $assert(($result->toolCalls[0]['function']['name'] ?? null) === 'sqrt', 'SSE tool name');
 $assert(($result->toolCalls[0]['function']['arguments'] ?? null) === '{"x":9}', 'SSE tool args merged');
+$assert(count($captureFixture->lines) === 7, 'SSE JSON payloads captured for trace');
 
 $normFromStream = NormalizedTurnOutcome::fromStreamResult($result);
 $assert($normFromStream->content === $result->content, 'Normalized matches stream content');

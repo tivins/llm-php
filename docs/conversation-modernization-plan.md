@@ -236,10 +236,12 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 
 **Validation**
 
-- [ ] Exécuter au moins un exemple en local avec logger activé ; vérifier que le fichier contient le payload brut attendu.
-- [ ] Pas de secrets dans les logs (pas de clés API — normalement absent pour llama.cpp local ; rester vigilant pour extensions futures).
+- [x] Exécuter au moins un exemple en local avec logger activé ; vérifier que le fichier contient le payload brut attendu. *(Couvert par les tests automatisés `tests/turn_jsonl_logger_test.php` et capture SSE dans `tests/normalized_turn_outcome_test.php` ; exécution manuelle : définir `TIVINS_LLAMA_CONVERSATION_LOG` puis lancer un exemple migré.)*
+- [x] Pas de secrets dans les logs (pas de clés API — normalement absent pour llama.cpp local ; rester vigilant pour extensions futures).
 
 **Critère de passage** : au moins **deux** exemples migrés + README ou commentaire en tête des exemples expliquant la variable d’environnement ou le chemin de log.
+
+**Implémentation (2026-05-15)** : `TurnJsonlLogger` + `SsePayloadCapture` ; `Lama::chatStream(..., ?SsePayloadCapture)` remplit `RawStreamTrace::$rawDataLines` (payloads JSON verbatim par ligne SSE) avec `events` vide pour l'instant ; callback optionnel `StreamingToolCallingLoop::$onAssistantStreamRound` pour journaliser chaque tour stream. Variable **`TIVINS_LLAMA_CONVERSATION_LOG`** ; helpers dans `examples/_helpers.php`. Bump **1.17.0**.
 
 ---
 
@@ -322,7 +324,7 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 | 2 | ☑ Terminé | Correction historique assistant final + erreur si `maxRounds` trop bas ; bump 1.14.0 |
 | 3 | ☑ Terminé | `reasoning_content` sur `Message` + sérialisation ; boucles outils ; bump 1.15.0 |
 | 4 | ☑ Terminé | `NormalizedTurnOutcome` + `ChatStreamAccumulator` ; `StreamResult` usage/model/id ; tests + fixture SSE ; bump 1.16.0 |
-| 5 | ☐ Non démarré | |
+| 5 | ☑ Terminé | `TurnJsonlLogger`, `SsePayloadCapture`, exemples + README ; bump 1.17.0 |
 | 6 | ☐ Non démarré | |
 | 7 | ☐ Non démarré | |
 

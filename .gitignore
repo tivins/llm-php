@@ -17,4 +17,6 @@ examples/chat-*.json
 
 
 examples/tmp*/
+examples/logs/
+*.session.jsonl
 var/
