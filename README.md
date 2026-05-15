@@ -2,11 +2,11 @@
 
 # llm-php (`tivins/llm-php`)
 
-**Version:** 1.18.1 (see [`composer.json`](composer.json); release history in [`CHANGELOG.md`](CHANGELOG.md)).
+**Version:** 1.20.1 (see [`composer.json`](composer.json); release history in [`CHANGELOG.md`](CHANGELOG.md)).
 
 PHP client library for an **OpenAI-compatible** HTTP API—typically **[llama.cpp `llama-server`](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)**—covering `POST /v1/chat/completions` (non-stream and **SSE** stream), plus **`/health`**, **`/tokenize`**, and model discovery via **`GET /v1/models`**.
 
-**In this README:** [Why not only `chat()`](#api-surface-chat-vs-chatcompletions-vs-chatstream) · [Module map](#module-map-srctivinsllama) · [Examples](#examples) · [Environment variables](#environment-variables) · [Tests](#tests) · [JSONL audit logs](#jsonl-audit-logs-turnjsonllogger--turnrecord) · [Console output](#console-output-humanturnrenderer--humanturnstreamdisplay) · [Pitfalls](#pitfalls-and-limits) · [Install](#installation)
+**In this README:** [Why not only `chat()`](#api-surface-chat-vs-chatcompletions-vs-chatstream) · [Module map](#module-map-srctivinsllama) · [Examples](#examples) · [Environment variables](#environment-variables) · [Tests](#tests) · [Conversation logging and modern message fields](#conversation-logging-and-modern-message-fields) · [JSONL audit logs](#jsonl-audit-logs-turnjsonllogger--turnrecord) · [Console output](#console-output-humanturnrenderer--humanturnstreamdisplay) · [Pitfalls](#pitfalls-and-limits) · [Install](#installation)
 
 ---
 
@@ -217,6 +217,33 @@ php tests/<name>_test.php
 - **`tests/stream_probe.php`** — live server: classifies incremental vs cumulative `content` deltas (complements fixture tests).
 
 Requires `vendor/autoload.php` (`composer install`).
+
+---
+
+## Conversation logging and modern message fields
+
+Use this overview to wire **audit logs**, **replay**, and **native reasoning** without re-reading every subsection; details are in the linked sections.
+
+### `Message` and constructor compatibility
+
+- Assistant messages support optional **`reasoningContent`** (wire key `reasoning_content`). New code should pass it with a **named argument** (`reasoningContent: '…'`) so it does not collide with **`$toolCalls`**.
+- Existing calls that only pass **`Role`**, **`content`**, and tool fields stay compatible. If you previously used **five positional** arguments for an assistant message, recall the signature is **`(role, content, toolCallId, name, toolCalls, reasoningContent)`** — add reasoning via the **last** named parameter rather than shifting arguments.
+
+### Tool-calling loops (behavior change)
+
+- Since **1.14.0**, **`ToolCallingLoop`** and **`StreamingToolCallingLoop`** append the **final** assistant turn (no `tool_calls`) when the model finishes, and throw if **`maxRounds`** is exhausted while tools are still pending. See [`CHANGELOG.md`](CHANGELOG.md) (1.14.0).
+
+### JSONL audit and replay
+
+- Enable **`TIVINS_LLAMA_CONVERSATION_LOG`** in examples ([Environment variables](#environment-variables)); each line is JSON from **`TurnRecord::toLogArray()`** (`raw_completion` or `raw_stream` + **`stream_result`**, optional **`request_messages`** for the prompt snapshot).
+- Reconstruct records with **`TurnRecord::fromLogArray()`**; terminal replay: **`examples/replay_turn_jsonl.php`**. Full field list: [JSONL audit logs](#jsonl-audit-logs-turnjsonllogger--turnrecord).
+
+### Normalized view and console
+
+- **`NormalizedTurnOutcome`** maps both non-stream completions and **`StreamResult`** into one shape ([API surface](#api-surface-chat-vs-chatcompletions-vs-chatstream)).
+- **`HumanTurnRenderer`** / **`HumanTurnStreamDisplay`** cover human-readable output ([Console output](#console-output-humanturnrenderer--humanturnstreamdisplay)).
+
+Implementation notes for contributors: [`docs/conversation-modernization-plan.md`](docs/conversation-modernization-plan.md).
 
 ---
 

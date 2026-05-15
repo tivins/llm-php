@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.20.1 — 2026-05-16
+
+- Docs: README section **Conversation logging and modern message fields** (logging, replay, `Message::reasoningContent`, tool-loop behavior note, cross-links); synchronized package version line with `composer.json`.
+- Docs: `docs/conversation-modernization-plan.md` — étape 7 (documentation / semver / état du plan) complétée.
+
 ## 1.20.0 — 2026-05-16
 
 - Feature: optional `request_messages` on `TurnRecord` (from `Conversation::toChatCompletionMessages()` in examples) for JSONL audit logs; `HumanTurnRenderer::renderTurnRecordRequestMessages()` and replay order in `examples/replay_turn_jsonl.php`.

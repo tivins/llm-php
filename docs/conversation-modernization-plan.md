@@ -282,16 +282,18 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 
 **Actions**
 
-- `README.md` : section « Conversation logging & modern message fields ».
+- `README.md` : section « Conversation logging & modern message fields » (en README anglais : **Conversation logging and modern message fields**).
 - `CHANGELOG.md` (si présent) ou suivre la convention du projet ; bump **semver** dans `composer.json` :
   - Extension de `Message` avec argument optionnel → généralement **minor** si BC préservée.
   - Changement de comportement des boucles d’outils → **minor** avec note **behavior change** dans changelog.
 - Mentionner la migration pour tout code utilisateur qui construisait `Message` en positionnel — PHP 8 named params réduisent la casse.
 
+**Implémentation (2026-05-16)** : section README **Conversation logging and modern message fields** (équivalent libre du titre français ci-dessus ; renvois vers variables d’environnement, JSONL / `TurnRecord`, replay, `NormalizedTurnOutcome`, comportement boucles 1.14.0, note constructeur `Message` / `reasoningContent`) ; lien vers ce plan pour le détail des étapes 0–6. **Patch 1.20.1** — alignement ligne de version README ↔ `composer.json` (le README affichait encore 1.18.1 alors que les livrables étaient en 1.20.0).
+
 **Validation**
 
-- [ ] Changelog à jour ; version cohérente.
-- [ ] Ce plan mis à jour : cocher les étapes réalisées ou ajouter une section « État » en fin de document.
+- [x] Changelog à jour ; version cohérente (`composer.json`, en-tête README, entrée CHANGELOG).
+- [x] Ce plan mis à jour : étape 7 cochée ; tableau « État d’avancement » à jour.
 
 ---
 
@@ -330,7 +332,7 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 | 4 | ☑ Terminé | `NormalizedTurnOutcome` + `ChatStreamAccumulator` ; `StreamResult` usage/model/id ; tests + fixture SSE ; bump 1.16.0 |
 | 5 | ☑ Terminé | `TurnJsonlLogger`, `SsePayloadCapture`, exemples + README ; bump 1.17.0 |
 | 6 | ☑ Terminé | `HumanTurnRenderer`, `HumanTurnStreamDisplay`, `print_output` + env (**`TIVINS_LLAMA_COMPLETION_DUMP_RAW`**, **`TIVINS_LLAMA_NO_ANSI`**…); exemples stream migrés ; tests `human_turn_renderer_test.php` ; bump 1.18.0 |
-| 7 | ☐ Non démarré | |
+| 7 | ☑ Terminé | README § « Conversation logging and modern message fields » ; changelog + semver alignés ; bump **1.20.1** (doc + correction version README) |
 
 ---
 
