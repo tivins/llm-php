@@ -39,6 +39,14 @@ If you have a GPU with 8–16GB of VRAM, you can try these models:
 
 ## Quick start
 
+**Prerequisite:** start **[`llama-server`](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)** and keep it running so the PHP client can reach its OpenAI-compatible HTTP API. Example (adjust the GGUF path and port):
+
+```bash
+llama-server -m ./model.gguf --port 8080 --no-webui -lv 0
+```
+
+The snippet below assumes the default listen address **`http://127.0.0.1:8080`**.
+
 From the repository root after `composer install`:
 
 ```php
