@@ -165,7 +165,7 @@ Values are read via `getenv()` / `putenv()` in library or example code as docume
 
 | Variable | Effect |
 |----------|--------|
-| **`TIVINS_LLAMA_CONVERSATION_LOG`** | Path to a JSONL file; **`TurnJsonlLogger`** appends one line per logical turn when examples wire logging (`TurnRecord::toLogArray()`). |
+| **`TIVINS_LLAMA_CONVERSATION_LOG`** | Path to a JSONL file; **`TurnJsonlLogger`** appends one line per logical turn when examples wire logging (`TurnRecord::toLogArray()`). Use **`{session}`** in the path for a per-process segment (new file each CLI run). |
 | **`TIVINS_LLAMA_NO_ANSI`** | Truthy (`1`, `true`, `yes`, `on`): disable ANSI in **`HumanTurnRenderer`** / **`HumanTurnStreamDisplay`**. |
 | **`TIVINS_LLAMA_REASONING_STDOUT`** | Truthy: print reasoning on stdout instead of stderr. |
 | **`TIVINS_LLAMA_COMPLETION_DUMP_RAW`** | Truthy: **`print_output()`** uses legacy verbose debug instead of **`HumanTurnRenderer`**. |
@@ -198,6 +198,7 @@ php tests/<name>_test.php
 - **`tests/normalized_turn_outcome_test.php`** — `ChatStreamAccumulator` / stream aggregation using **`tests/fixtures/sse_chat_stream_enriched_fixture.sse.txt`** (`content`, `reasoning_content`, `tool_calls`, `finish_reason`, `usage`).
 - **`tests/human_turn_renderer_test.php`** — `HumanTurnRenderer` and stream display with in-memory streams.
 - **`tests/examples_env_loader_test.php`** — `examples/.env` loading respects an existing **`TIVINS_LLAMA_CONVERSATION_LOG`**.
+- **`tests/conversation_log_path_session_test.php`** — `{session}` placeholder in **`TIVINS_LLAMA_CONVERSATION_LOG`** resolves once per process.
 - **`tests/turn_jsonl_logger_test.php`** — JSONL logger.
 - **`tests/turn_record_test.php`** — `TurnRecord` / DTO golden shapes.
 - **`tests/tool_calling_loop_test.php`** — non-stream and streaming tool loops (including callbacks / exhaustion cases).

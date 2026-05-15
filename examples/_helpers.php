@@ -63,7 +63,10 @@ function example_load_examples_env_file(): void
  * Optional JSONL conversation log when env {@code TIVINS_LLAMA_CONVERSATION_LOG} is set to a file path (append mode).
  * Reads {@code examples/.env} via {@see example_load_examples_env_file()} when this function runs, unless the variable is already set in the environment.
  *
- * Example (bash): {@code export TIVINS_LLAMA_CONVERSATION_LOG=examples/logs/demo.session.jsonl}
+ * If the path contains the literal segment {@code {session}}, it is replaced once per PHP process with an opaque id (timestamp + random hex),
+ * so each CLI run (e.g. restart after Ctrl+C) writes to a new file while {@code getenv()} keeps the template unchanged.
+ *
+ * Example (bash): {@code export TIVINS_LLAMA_CONVERSATION_LOG=examples/logs/demo.{session}.jsonl}
  *
  * Convention in migrated examples:
  * - Non-stream tool loops: one JSONL line per HTTP assistant completion ("round"): initial completion plus each follow-up after tool execution (see {@see print_output} / {@see ToolCallingLoop::runUntilIdle()} {@code $afterRoundCompletion}).
@@ -78,6 +81,14 @@ function example_turn_jsonl_logger_from_env(): ?TurnJsonlLogger
     $path = getenv('TIVINS_LLAMA_CONVERSATION_LOG');
     if ($path === false || !is_string($path) || $path === '') {
         return null;
+    }
+
+    if (str_contains($path, '{session}')) {
+        static $sessionSegment = null;
+        if ($sessionSegment === null) {
+            $sessionSegment = date('Ymd-His') . '-' . bin2hex(random_bytes(4));
+        }
+        $path = str_replace('{session}', $sessionSegment, $path);
     }
 
     return new TurnJsonlLogger($path, append: true);

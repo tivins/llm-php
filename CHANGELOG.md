@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.18.2 — 2026-05-15
+
+- Examples: `TIVINS_LLAMA_CONVERSATION_LOG` supports a `{session}` path segment (resolved once per PHP process in `example_turn_jsonl_logger_from_env()`); default `examples/.env` uses `examples/logs/example.{session}.jsonl`.
+- Tests: `tests/conversation_log_path_session_test.php`.
+
 ## 1.18.1 — 2026-05-15
 
 - Examples: `examples/chat.php` shows streamed `reasoning_content` via `HumanTurnStreamDisplay`; session JSON persists optional `reasoning_content` on assistant messages.

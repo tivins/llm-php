@@ -20,7 +20,7 @@ $assert = static function (bool $ok, string $msg) use (&$failed): void {
     }
 };
 
-$expectedFromFile = 'examples/logs/example.session.jsonl';
+$expectedFromFile = 'examples/logs/example.{session}.jsonl';
 
 $before = getenv('TIVINS_LLAMA_CONVERSATION_LOG');
 example_load_examples_env_file();

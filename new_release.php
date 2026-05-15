@@ -37,13 +37,13 @@ catch (Exception $e) {
 $lastVersionNumbers = ltrim($lastVersion, 'v');
 echo "Creating tag {$lastVersion} ($lastVersionNumbers) -> {$gitVersion} ($version)\n";
 
-$releaseNotes = '
-# Release v'.$version.'
+$releaseNotes = 'Release v'.$version;
+/*.'
 
 **Full Changelog**: https://github.com/tivins/llm-php/compare/v'.$lastVersionNumbers.'...v'.$version.'';
 
 echo "Release notes: {$releaseNotes}\n";
-
+*/
 
 /*
 try {

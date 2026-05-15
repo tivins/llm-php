@@ -18,5 +18,5 @@ examples/chat-*.json
 
 examples/tmp*/
 examples/logs/
-*.session.jsonl
+*.jsonl
 var/
