@@ -2,7 +2,7 @@
 
 # llm-php (`tivins/llm-php`)
 
-**Version:** 1.20.1 (see [`composer.json`](composer.json); release history in [`CHANGELOG.md`](CHANGELOG.md)).
+**Version:** 1.20.2 (see [`composer.json`](composer.json); release history in [`CHANGELOG.md`](CHANGELOG.md)).
 
 PHP client library for an **OpenAI-compatible** HTTP API—typically **[llama.cpp `llama-server`](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)**—covering `POST /v1/chat/completions` (non-stream and **SSE** stream), plus **`/health`**, **`/tokenize`**, and model discovery via **`GET /v1/models`**.
 
@@ -243,7 +243,7 @@ Use this overview to wire **audit logs**, **replay**, and **native reasoning** w
 - **`NormalizedTurnOutcome`** maps both non-stream completions and **`StreamResult`** into one shape ([API surface](#api-surface-chat-vs-chatcompletions-vs-chatstream)).
 - **`HumanTurnRenderer`** / **`HumanTurnStreamDisplay`** cover human-readable output ([Console output](#console-output-humanturnrenderer--humanturnstreamdisplay)).
 
-Implementation notes for contributors: [`docs/conversation-modernization-plan.md`](docs/conversation-modernization-plan.md).
+Contributor-facing implementation history for these features lives in [`CHANGELOG.md`](CHANGELOG.md) (releases **1.14.0** through **1.20.x**) and in the sections above.
 
 ---
 

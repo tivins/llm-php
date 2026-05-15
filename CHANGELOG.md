@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.20.2 — 2026-05-16
+
+- Docs: removed completed roadmap `docs/conversation-modernization-plan.md`; README points contributors to `CHANGELOG.md` and in-repo sections instead.
+
 ## 1.20.1 — 2026-05-16
 
 - Docs: README section **Conversation logging and modern message fields** (logging, replay, `Message::reasoningContent`, tool-loop behavior note, cross-links); synchronized package version line with `composer.json`.
