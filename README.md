@@ -1,81 +1,244 @@
-# LLM-PHP
+**Language:** English
 
-Goal: Run LLM inference locally on a machine with **8 GB of VRAM or more**.
+# llm-php (`tivins/llm-php`)
 
-Stack: Llama.cpp + a lightweight model (Gemma 2 9B, Gemma 4 4B, Qwen 2.5 7B, …).
+**Version:** 1.18.1 (see [`composer.json`](composer.json); release history in [`CHANGELOG.md`](CHANGELOG.md)).
 
-Beyond exposing llama.cpp from PHP, **llm-php** adds higher-level helpers—such as "thinking"-style prompting, preset personas, and **configurable** tool calling: you declare tools (schemas + bound executors) and run multi-step loops until the model is done. That is not limited to ad hoc PHP callables—`PredefinedTools` ships ready-made workflows the model can drive (for example `grep`, `web_search`, `fetch_web_page`, file read/write, `apply_diff`, `git_status`, and more).
+PHP client library for an **OpenAI-compatible** HTTP API—typically **[llama.cpp `llama-server`](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)**—covering `POST /v1/chat/completions` (non-stream and **SSE** stream), plus **`/health`**, **`/tokenize`**, and model discovery via **`GET /v1/models`**.
+
+**In this README:** [Why not only `chat()`](#api-surface-chat-vs-chatcompletions-vs-chatstream) · [Module map](#module-map-srctivinsllama) · [Examples](#examples) · [Environment variables](#environment-variables) · [Tests](#tests) · [JSONL audit logs](#jsonl-audit-logs-turnjsonllogger--turnrecord) · [Console output](#console-output-humanturnrenderer--humanturnstreamdisplay) · [Pitfalls](#pitfalls-and-limits) · [Install](#installation)
+
+---
 
 ## Installation
 
-### llm-php
+### Package
 
 ```shell
 composer require tivins/llm-php
 ```
 
-### llama.cpp
+**Requires:** `ext-curl`.
 
-[https://github.com/ggml-org/llama.cpp/blob/master/docs/install.md](https://github.com/ggml-org/llama.cpp/blob/master/docs/install.md)
+### llama.cpp server
 
-```shell
-apt install llama-cpp    # linux
-brew install llama.cpp   # mac/linux
-winget install llama.cpp # windows
-```
+- Install: [llama.cpp install docs](https://github.com/ggml-org/llama.cpp/blob/master/docs/install.md)
+- Server API: [server README](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)
 
-API Doc : [https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)
+### Models
 
-### Downloading a model (≤ 6.5 GB)
+Use a **GGUF** checkpoint sized for your GPU/RAM; exact limits depend on quantization and context. The library does not download models—it only talks to a running server.
 
-Pick a [GGUF](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md) file that leaves headroom on your VRAM—the KV cache and GPU drivers use memory too. On an **8 GB VRAM** card, aim for roughly **about 5 to 6.5 GB** for model weights in practice, depending on quantization and context length.
+If you have a GPU with 8–16GB of VRAM, you can try these models:
 
-- [https://huggingface.co/bartowski/google_gemma-4-E4B-it-GGUF](https://huggingface.co/bartowski/google_gemma-4-E4B-it-GGUF) (google_gemma-4-E4B-it-Q5_K_M.gguf or google_gemma-4-E4B-it-Q6_K.gguf)
-- [https://huggingface.co/bartowski/gemma-2-9b-it-GGUF](https://huggingface.co/bartowski/gemma-2-9b-it-GGUF) (gemma-2-9b-it-Q4_K_M.gguf)
-- [https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF](https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF) (Qwen2.5-7B-Instruct-Q4_K_M)
+- [https://huggingface.co/bartowski/google_gemma-4-E4B-it-GGUF](https://huggingface.co/bartowski/google_gemma-4-E4B-it-GGUF) (Q5_K_M or Q6_K)
+- [https://huggingface.co/bartowski/gemma-2-9b-it-GGUF](https://huggingface.co/bartowski/gemma-2-9b-it-GGUF) (Q4_K_M)
+- [https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF](https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF) (Q4_K_M)
 
-## PHP usage
+---
 
-**Minimal example:**
+## Quick start
 
-First, run llama.cpp server (run.sh, run.bat).
+From the repository root after `composer install`:
 
 ```php
+use Tivins\Llama\BehaviorPrompts;
+use Tivins\Llama\Conversation;
+use Tivins\Llama\Lama;
+use Tivins\Llama\Message;
+use Tivins\Llama\Role;
+
+require __DIR__ . '/vendor/autoload.php';
+
 $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
 $conversation = new Conversation();
 $conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));
-$conversation->addMessage(new Message(Role::User, 'List and briefly explain five practical habits that improve learning retention, with one short paragraph per habit (about 3–5 sentences each).'));
-$answer = trim($lama->chat($conversation));
+$conversation->addMessage(new Message(Role::User, 'Hello.'));
+$text = $lama->chat($conversation);
 ```
 
-Note: This example is simplified, it does not handle exceptions and does not check whether the LLM is reachable (health).
+`Lama::fromServerUrl()` picks the **first** model id from `/v1/models`. Check `$lama->getHealth()` returns `'ok'` before relying on the server.
 
-See the `examples` folder for more.
+Sampling and generation knobs (`temperature`, `top_p`, `max_tokens`, penalties, `seed`, `stop`, `n`, **`tools`**, **`tool_choice`**) go through **`Tivins\Llama\ChatCompletionOptions`**: only properties you set are merged into the JSON body; omitted keys leave server defaults.
 
-**Sampling and generation options** (OpenAI-compatible body fields such as `temperature`, `top_p`, `max_tokens`, penalties, `seed`, `stop`, `n`) are passed via `ChatCompletionOptions` as an optional argument to `chat()`, `chatCompletions()`, and `chatStream()`. Only properties you set are sent; omitted fields keep the server defaults. See the class docblock on `ChatCompletionOptions` for parameter meanings and compatibility notes for local backends.
+---
 
-```php
-use Tivins\Llama\ChatCompletionOptions;
+## API surface: `chat()` vs `chatCompletions()` vs `chatStream()`
 
-$sampler = new ChatCompletionOptions(temperature: 0.4, top_p: 0.9, max_tokens: 256, seed: 42);
-$answer = trim($lama->chat($conversation, $sampler));
+| Method | Input → output | Preserved | Lost or narrowed |
+|--------|----------------|-----------|------------------|
+| **`Tivins\Llama\Lama::chat()`** | `Conversation` + optional `ChatCompletionOptions` → **`string`** | Final assistant **`content`** from `choices[0].message` (empty string if missing) | **`tool_calls`**, native **`reasoning_content`**, **`usage`**, additional choices, full wire JSON |
+| **`Tivins\Llama\Lama::chatCompletions()`** | Same → **decoded JSON `array`** (`choices`, `usage`, …) | Everything the **server** returns in that response body | Nothing by the library—you inspect the array |
+| **`Tivins\Llama\Lama::chatStream()`** | Same + stream callbacks + optional **`Tivins\Llama\SsePayloadCapture`** → **`Tivins\Llama\StreamResult`** | Aggregated **`content`**, **`reasoning_content`** (when streamed), reconstructed **`tool_calls`**, **`finish_reason`**; **`usage`**, **`model`**, **`id`** when present on **stream chunks** (otherwise `null`) | Per-chunk raw JSON unless you capture SSE payloads; shape of **`usage`** is backend-specific |
+
+**Fidelity path:** use **`chatCompletions()`** and/or **`chatStream()`**, then map results into your own structures or into **`Tivins\Llama\Dto\NormalizedTurnOutcome`** (`fromChatCompletionArray()` / `fromStreamResult()`) for a single aggregate shape across modes.
+
+**Shortcut:** `chat()` is documented in code as a thin wrapper around `chatCompletions()`; it is fine for plain text, not for tools or native reasoning traces.
+
+---
+
+## Module map (`src/Tivins/Llama/`)
+
+### Client
+
+- **`Tivins\Llama\Lama`** — HTTP client: `fromServerUrl()`, `getHealth()` / `getHealthRaw()`, `tokenize()`, `chat()`, `chatCompletions()`, `chatStream()`.
+
+### Conversation model
+
+- **`Tivins\Llama\Conversation`** — ordered `Message` list; `toChatCompletionMessages()` builds OpenAI-style `messages` (assistant `tool_calls`, `tool` role + `tool_call_id`, optional assistant **`reasoning_content`**).
+- **`Tivins\Llama\Message`** — `Role`, `content`, optional `toolCallId` / `name` for `Role::Tool`, optional `toolCalls` (assistant), optional **`reasoningContent`** (native reasoning); `normalizeReasoningContent()` treats `null` and `''` as absent for JSON.
+- **`Tivins\Llama\Role`** — `system`, `user`, `assistant`, `tool`.
+
+### Request options
+
+- **`Tivins\Llama\ChatCompletionOptions`** — OpenAI-shaped optional fields merged into the chat-completions body (see class docblock for semantics and local-server caveats).
+
+### Tools
+
+- **`Tivins\Llama\ChatFunctionTool`** — build one `tools[]` entry (`toToolArray()`, `toToolArrays()`).
+- **`Tivins\Llama\ToolCallingLoop`** — multi-round loop over **`chatCompletions()`**: executes tools, appends `Role::Tool` messages, copies **`reasoning_content`** when present; final assistant turn has no `tool_calls` when idle; throws if max rounds exhausted with pending tools.
+- **`Tivins\Llama\StreamingToolCallingLoop`** — same orchestration over **`chatStream()`**; optional **`onAssistantStreamRound(StreamResult, RawStreamTrace, int)`** for logging (SSE capture when callback is used).
+- **`Tivins\Llama\PredefinedTools`** — ready-made tools (search, fetch, filesystem helpers, `apply_diff`, git helpers, etc.) with executors suited to examples; see **`examples/`** and class docblock (includes TLS-related environment variables).
+
+### DTOs and audit
+
+- **`Tivins\Llama\Dto\TurnRecord`** — one logical turn for JSONL (`forCompletion` / `forStream`, `toLogArray()`).
+- **`Tivins\Llama\Dto\RawChatCompletionResponse`** — wraps non-stream completion JSON.
+- **`Tivins\Llama\Dto\RawStreamTrace`** — `events` (list of **`StreamEvent`**) plus optional **`rawDataLines`** (verbatim SSE JSON strings).
+- **`Tivins\Llama\Dto\StreamEvent`** / **`Tivins\Llama\Dto\StreamEventKind`** — structured stream replay types (fine-grained event lists may be empty depending on capture path).
+- **`Tivins\Llama\Dto\NormalizedTurnOutcome`** — normalized assistant fields from completion JSON or **`StreamResult`**.
+- **`Tivins\Llama\SsePayloadCapture`** — mutable bag of SSE JSON payload strings for **`RawStreamTrace::$rawDataLines`**.
+- **`Tivins\Llama\TurnJsonlLogger`** — append one JSON line per `TurnRecord`.
+
+### Streaming aggregation
+
+- **`Tivins\Llama\ChatStreamAccumulator`** — parses `data: {...}` SSE lines into **`StreamResult`** (shared by **`Lama::chatStream()`** and tests/fixtures).
+- **`Tivins\Llama\StreamResult`** — `content`, `finishReason`, `toolCalls`, `reasoningContent`, optional `usage`, `model`, `id`.
+
+### Console rendering
+
+- **`Tivins\Llama\RenderOptions`** — ANSI, stdout/stderr injectable, reasoning channel.
+- **`Tivins\Llama\HumanTurnRenderer`** — render **`NormalizedTurnOutcome`**, **`TurnRecord`**, or raw completion payload (`renderCompletionPayload()`).
+- **`Tivins\Llama\HumanTurnStreamDisplay`** — stream-friendly callbacks aligned with **`Lama::chatStream()`** / **`StreamingToolCallingLoop`**.
+
+### Higher-level helpers (optional)
+
+- **`Tivins\Llama\ThinkingChat`** / **`ThinkingPrompts`** / **`ThinkingTurnResult`** — **two HTTP rounds** (reasoning prompt then answer); **not** the same as a single completion’s native **`reasoning_content`** (see class docblock).
+- **`Tivins\Llama\BehaviorPrompts`** — ready-made system prompt strings.
+- **`Tivins\Llama\Translator`** — translation helper built on **`Lama::chat()`** with optional FIFO cache.
+
+---
+
+## Examples
+
+Location: **`examples/`**. Scripts use:
+
+```text
+require __DIR__ . '/../vendor/autoload.php';
 ```
 
-## Tests et diagnostic stream
+Run from the **repository root** (so `vendor/` resolves), with **llama-server** listening where the script expects (many examples use `http://127.0.0.1:8080`):
 
-Run unit checks with `php tests/<name>_test.php` (see `tests/*_test.php`). `tests/normalized_turn_outcome_test.php` replays a static SSE fixture (`tests/fixtures/sse_chat_stream_enriched_fixture.sse.txt`) through `ChatStreamAccumulator`, asserting aggregation of `content`, `reasoning_content`, `tool_calls`, `finish_reason`, and `usage` without a live LLM server. `tests/examples_env_loader_test.php` checks that `examples/.env` is applied by `example_load_examples_env_file()` when `TIVINS_LLAMA_CONVERSATION_LOG` is not already set in the environment. **`tests/human_turn_renderer_test.php`** exercises `HumanTurnRenderer` and stream display delegates with in-memory stdout/stderr.
+```shell
+composer install
+php examples/chat.php
+php examples/completions.php
+php examples/tokenize.php
+php examples/tools_chain.php
+php examples/stream_tools_chain.php
+php examples/web_lookup_chain.php
+php examples/stream_web_lookup_chain.php
+php examples/workspace_tools_demo.php
+```
 
-`tests/stream_probe.php` remains an **interactive** script (against a running local server) to classify whether a backend emits **cumulative** vs **incremental** `content` deltas. It complements, but does not replace, these OpenAI-shaped parsing fixtures; no change to `stream_probe.php` was required for Étape 4.
+Additional demos include `chat_tools.php`, `mediation.php`, `moderation.php`, `exemples.php`, etc. Prefer reading each file’s header comment for prerequisites (e.g. `patch` on PATH for `workspace_tools_demo.php`).
 
-## Conversation logging (JSONL)
+Shared helpers: **`examples/_helpers.php`** (`print_output()`, JSONL helpers, render env parsing). Optional defaults: **`examples/.env`** (loaded without overriding variables already in the process environment).
 
-Optional audit logs use **`TurnJsonlLogger`** (`Tivins\Llama\TurnJsonlLogger`): one JSON object per line from **`TurnRecord::toLogArray()`**. Set environment variable **`TIVINS_LLAMA_CONVERSATION_LOG`** to a file path before running migrated examples (`examples/chat.php`, tool demos, etc.), or rely on **`examples/.env`** (read when **`examples/_helpers.php`** is loaded and the logger helper runs); logs go under `examples/logs/` by convention (ignored by git — see `.gitignore`). For streaming, **`Lama::chatStream(..., ?SsePayloadCapture $capture)`** records verbatim SSE JSON payloads into **`RawStreamTrace::$rawDataLines`** (structured **`StreamEvent`** replay lists stay optional / empty in this path). Avoid logging if responses might contain secrets once you attach remote backends or API keys.
+---
 
-## Human-readable console output (`HumanTurnRenderer`)
+## Environment variables
 
-**`HumanTurnRenderer`** renders **`NormalizedTurnOutcome`** or **`TurnRecord`** (replay from JSONL) with reasoning on stderr by default. **`examples/stream_*_chain.php`** and **`examples/chat.php`** use **`HumanTurnStreamDisplay`** for streamed reply tokens and reasoning deltas (options from **`example_render_options_from_env()`**).
+Values are read via `getenv()` / `putenv()` in library or example code as documented below. **Do not enable logging** if completions could contain secrets.
 
-In examples, **`print_output()`** delegates to **`HumanTurnRenderer::renderCompletionPayload()`** after **`examples/.env`** is loaded. **`TIVINS_LLAMA_COMPLETION_DUMP_RAW=1`** restores the verbose legacy diagnostics. **`TIVINS_LLAMA_NO_ANSI=1`** and **`TIVINS_LLAMA_REASONING_STDOUT=1`** tweak colours and where reasoning prints (via **`example_render_options_from_env()`**).
+### Examples / console (`examples/_helpers.php`, `examples/.env`)
 
-Regression coverage: **`tests/human_turn_renderer_test.php`** (memory streams; colors off). On Windows PowerShell, use Windows Terminal when leaving ANSI escapes enabled.
+| Variable | Effect |
+|----------|--------|
+| **`TIVINS_LLAMA_CONVERSATION_LOG`** | Path to a JSONL file; **`TurnJsonlLogger`** appends one line per logical turn when examples wire logging (`TurnRecord::toLogArray()`). |
+| **`TIVINS_LLAMA_NO_ANSI`** | Truthy (`1`, `true`, `yes`, `on`): disable ANSI in **`HumanTurnRenderer`** / **`HumanTurnStreamDisplay`**. |
+| **`TIVINS_LLAMA_REASONING_STDOUT`** | Truthy: print reasoning on stdout instead of stderr. |
+| **`TIVINS_LLAMA_COMPLETION_DUMP_RAW`** | Truthy: **`print_output()`** uses legacy verbose debug instead of **`HumanTurnRenderer`**. |
 
+`example_load_examples_env_file()` reads **`examples/.env`** only for keys **not** already set in the environment.
+
+### HTTP/TLS for tool traffic (`PredefinedTools`, e.g. `web_search` / `fetch_web_page`)
+
+| Variable | Effect |
+|----------|--------|
+| **`TIVINS_LLAMA_CURL_CAINFO`** | Path to a PEM CA bundle. |
+| **`TIVINS_LLAMA_CURL_WINDOWS_NATIVE_CA`** | `1` prefers Windows certificate store even when **`CAINFO`** is set; `0` disables native CA behaviour (see **`PredefinedTools`** docblock). |
+| **`TIVINS_LLAMA_HTTP_SSL_VERIFY`** | `0` / `false` / `no` / `off` disables TLS verification (insecure; dev only). |
+
+Programmatic override: **`PredefinedTools::setHttpSslVerifyPeer()`** (documented on the class).
+
+---
+
+## Tests
+
+Convention: each file is a standalone script run with PHP:
+
+```shell
+php tests/<name>_test.php
+```
+
+**Automated coverage (no live server for most):**
+
+- **`tests/chat_completion_options_test.php`** — `ChatCompletionOptions` and request body assembly (includes reasoning serialization behaviour).
+- **`tests/normalized_turn_outcome_test.php`** — `ChatStreamAccumulator` / stream aggregation using **`tests/fixtures/sse_chat_stream_enriched_fixture.sse.txt`** (`content`, `reasoning_content`, `tool_calls`, `finish_reason`, `usage`).
+- **`tests/human_turn_renderer_test.php`** — `HumanTurnRenderer` and stream display with in-memory streams.
+- **`tests/examples_env_loader_test.php`** — `examples/.env` loading respects an existing **`TIVINS_LLAMA_CONVERSATION_LOG`**.
+- **`tests/turn_jsonl_logger_test.php`** — JSONL logger.
+- **`tests/turn_record_test.php`** — `TurnRecord` / DTO golden shapes.
+- **`tests/tool_calling_loop_test.php`** — non-stream and streaming tool loops (including callbacks / exhaustion cases).
+- **`tests/predefined_tools_test.php`** — bundled tool behaviour.
+
+**Interactive / diagnostic:**
+
+- **`tests/stream_probe.php`** — live server: classifies incremental vs cumulative `content` deltas (complements fixture tests).
+
+Requires `vendor/autoload.php` (`composer install`).
+
+---
+
+## JSONL audit logs (`TurnJsonlLogger` / `TurnRecord`)
+
+- **`TurnJsonlLogger`** writes **one JSON object per line** from **`TurnRecord::toLogArray()`**.
+- **Non-stream:** `TurnRecord::forCompletion()` stores the full completion JSON under `raw_completion`.
+- **Stream:** `TurnRecord::forStream()` includes **`StreamResult`** fields and **`RawStreamTrace`**; when SSE capture is used, **`raw_data_lines`** holds verbatim SSE JSON strings; structured **`events`** may be empty depending on the capture path.
+
+Treat log files as **sensitive** if they can contain user data or downstream secrets.
+
+---
+
+## Console output (`HumanTurnRenderer` / `HumanTurnStreamDisplay`)
+
+- **`HumanTurnRenderer`** prints usage (if present), model/id, finish reason, reasoning block, content, and tool calls for **`NormalizedTurnOutcome`** or **`TurnRecord`** replay; **`renderCompletionPayload()`** adapts a raw **`chatCompletions()`** array.
+- **`HumanTurnStreamDisplay`** separates streamed **content** (stdout by default), **reasoning** (stderr by default), and tool fragments / summaries (stderr), consistent with **`examples/stream_*.php`**.
+- On Windows, use a modern terminal (e.g. Windows Terminal) for ANSI; or set **`TIVINS_LLAMA_NO_ANSI`**.
+
+---
+
+## Pitfalls and limits
+
+- **`Lama::chat()`** discards everything except first-choice **`content`**—avoid it for tool calling or native **`reasoning_content`**.
+- **Streaming `usage`:** many backends omit **`usage`** on SSE chunks; **`StreamResult::$usage`** stays `null` unless the server sends a usable **`usage`** object on a parsed chunk (the library keeps the **last** such object).
+- **Wire JSON shapes** vary by server version; rely on this library’s aggregation helpers and tests for supported fields, or inspect raw payloads / logs.
+- **JSONL and captures** can persist full prompts and completions—**no secrets** in shared logs.
+- **`ChatCompletionOptions`** passes through keys the **server** may ignore or reject—check your backend’s supported subset.
+
+---
+
+## License
+
+MIT — see [`composer.json`](composer.json).
