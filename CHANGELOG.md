@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.19.0 — 2026-05-15
+
+- Feature: `TurnRecord::fromLogArray()`, `RawStreamTrace::fromLogArray()`, `StreamEvent::fromLogArray()`, and `StreamResult::fromLogArray()` for replaying JSONL audit lines.
+- Examples: `examples/replay_turn_jsonl.php` — terminal replay with colors (aggregated turn + optional `--sse` chunk replay).
+- Tests: round-trip assertions in `tests/turn_record_test.php`.
+
 ## 1.18.2 — 2026-05-15
 
 - Examples: `TIVINS_LLAMA_CONVERSATION_LOG` supports a `{session}` path segment (resolved once per PHP process in `example_turn_jsonl_logger_from_env()`); default `examples/.env` uses `examples/logs/example.{session}.jsonl`.

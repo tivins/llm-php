@@ -20,6 +20,8 @@ use Tivins\Llama\StreamResult;
  * - `raw_completion` (object): full non-stream response JSON when `mode === completion`
  * - `raw_stream` (object): `{ events: [...], raw_data_lines?: [...] }` when `mode === stream`
  * - `stream_result` (object): aggregated {@see StreamResult} fields when `mode === stream` (`content`, `finish_reason`, `tool_calls`, `reasoning_content`; when set: optional `usage`, `model`, `id`)
+ *
+ * {@see self::fromLogArray()} reconstructs a record from one decoded JSON object (e.g. JSONL replay tools).
  */
 final readonly class TurnRecord
 {
@@ -120,5 +122,72 @@ final readonly class TurnRecord
         }
 
         return $out;
+    }
+
+    /**
+     * Decode one JSONL object produced by {@see self::toLogArray()} (e.g. from {@see TurnJsonlLogger}).
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function fromLogArray(array $data): self
+    {
+        $id = isset($data['id']) && is_string($data['id']) ? $data['id'] : '';
+        if ($id === '') {
+            throw new InvalidArgumentException('Turn log line missing string id.');
+        }
+
+        $createdAt = isset($data['created_at']) && is_string($data['created_at']) ? $data['created_at'] : '';
+        if ($createdAt === '') {
+            throw new InvalidArgumentException('Turn log line missing string created_at.');
+        }
+
+        $mode = isset($data['mode']) && is_string($data['mode']) ? $data['mode'] : '';
+        if ($mode !== 'completion' && $mode !== 'stream') {
+            throw new InvalidArgumentException('Turn log line mode must be "completion" or "stream".');
+        }
+
+        $requestOptions = null;
+        if (isset($data['request_options']) && is_array($data['request_options']) && $data['request_options'] !== []) {
+            $requestOptions = $data['request_options'];
+        }
+
+        if ($mode === 'completion') {
+            $raw = $data['raw_completion'] ?? null;
+            if (!is_array($raw)) {
+                throw new InvalidArgumentException('completion log line missing raw_completion object.');
+            }
+
+            return new self(
+                id: $id,
+                createdAt: $createdAt,
+                mode: 'completion',
+                requestOptions: $requestOptions,
+                completionResponse: new RawChatCompletionResponse($raw),
+                streamTrace: null,
+                streamResult: null,
+            );
+        }
+
+        $rawStream = $data['raw_stream'] ?? null;
+        if (!is_array($rawStream)) {
+            throw new InvalidArgumentException('stream log line missing raw_stream object.');
+        }
+        $trace = RawStreamTrace::fromLogArray($rawStream);
+
+        $streamResultData = $data['stream_result'] ?? null;
+        if (!is_array($streamResultData)) {
+            throw new InvalidArgumentException('stream log line missing stream_result object.');
+        }
+        $result = StreamResult::fromLogArray($streamResultData);
+
+        return new self(
+            id: $id,
+            createdAt: $createdAt,
+            mode: 'stream',
+            requestOptions: $requestOptions,
+            completionResponse: null,
+            streamTrace: $trace,
+            streamResult: $result,
+        );
     }
 }

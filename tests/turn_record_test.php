@@ -81,6 +81,11 @@ $canonActual = json_encode(deep_sort_json_values($log), JSON_THROW_ON_ERROR | JS
 $canonExpected = json_encode(deep_sort_json_values($expectedLog), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 $assert($canonActual === $canonExpected, 'completion toLogArray matches golden fixture');
 
+$roundCompletion = TurnRecord::fromLogArray($log);
+$roundLog = $roundCompletion->toLogArray();
+$canonRound = json_encode(deep_sort_json_values($roundLog), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$assert($canonRound === $canonActual, 'completion fromLogArray roundtrips toLogArray');
+
 $emptyOptsRecord = TurnRecord::forCompletion(
     id: 'turn-empty-opts',
     response: $raw,
@@ -111,5 +116,11 @@ $assert(($streamLog['mode'] ?? '') === 'stream', 'stream mode');
 $assert(isset($streamLog['raw_stream']['events']) && count($streamLog['raw_stream']['events']) === 2, 'stream events');
 $assert(($streamLog['stream_result']['finish_reason'] ?? '') === 'stop', 'stream_result finish_reason');
 $assert(($streamLog['raw_stream']['raw_data_lines'][0] ?? '') === '{"x":1}', 'raw_data_lines preserved');
+
+$roundStream = TurnRecord::fromLogArray($streamLog);
+$roundStreamLog = $roundStream->toLogArray();
+$canonStreamRound = json_encode(deep_sort_json_values($roundStreamLog), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$canonStreamOrig = json_encode(deep_sort_json_values($streamLog), JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$assert($canonStreamRound === $canonStreamOrig, 'stream fromLogArray roundtrips toLogArray');
 
 exit($failed ? 1 : 0);

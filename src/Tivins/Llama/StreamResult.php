@@ -41,4 +41,40 @@ final readonly class StreamResult
     {
         return $this->toolCalls !== [];
     }
+
+    /**
+     * Rebuild from {@see TurnRecord}-style JSONL `stream_result` object.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function fromLogArray(array $data): self
+    {
+        $content = isset($data['content']) && is_string($data['content']) ? $data['content'] : '';
+        $finishReason = isset($data['finish_reason']) && is_string($data['finish_reason']) ? $data['finish_reason'] : '';
+        $reasoningContent = isset($data['reasoning_content']) && is_string($data['reasoning_content']) ? $data['reasoning_content'] : '';
+
+        $rawToolCalls = $data['tool_calls'] ?? [];
+        $toolCalls = [];
+        if (is_array($rawToolCalls)) {
+            foreach ($rawToolCalls as $tc) {
+                if (is_array($tc)) {
+                    $toolCalls[] = $tc;
+                }
+            }
+        }
+
+        $usage = isset($data['usage']) && is_array($data['usage']) ? $data['usage'] : null;
+        $model = isset($data['model']) && is_string($data['model']) && $data['model'] !== '' ? $data['model'] : null;
+        $id = isset($data['id']) && is_string($data['id']) && $data['id'] !== '' ? $data['id'] : null;
+
+        return new self(
+            content: $content,
+            finishReason: $finishReason,
+            toolCalls: $toolCalls,
+            reasoningContent: $reasoningContent,
+            usage: $usage,
+            model: $model,
+            id: $id,
+        );
+    }
 }
