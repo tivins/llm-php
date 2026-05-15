@@ -26,6 +26,7 @@ class Conversation
 
     /**
      * OpenAI-compatible chat messages, including optional `tool_calls` / `tool_call_id` when set on {@see Message}.
+     * Assistant messages may include `reasoning_content` when {@see Message::$reasoningContent} is non-null (non-empty strings only; see {@see Message::normalizeReasoningContent()}).
      *
      * @return list<array<string, mixed>>
      */
@@ -44,6 +45,9 @@ class Conversation
                         'tool_calls' => $m->toolCalls,
                     ];
                     $row['content'] = $m->content === '' ? null : $m->content;
+                    if ($m->reasoningContent !== null) {
+                        $row['reasoning_content'] = $m->reasoningContent;
+                    }
 
                     return $row;
                 }
@@ -65,10 +69,15 @@ class Conversation
                     return $row;
                 }
 
-                return [
+                $row = [
                     'role' => $m->role->value,
                     'content' => $m->content,
                 ];
+                if ($m->role === Role::Assistant && $m->reasoningContent !== null) {
+                    $row['reasoning_content'] = $m->reasoningContent;
+                }
+
+                return $row;
             },
             $this->messages,
         ));

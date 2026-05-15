@@ -13,8 +13,8 @@ use RuntimeException;
  * or {@see self::runUntilIdle()} exhausts {@code $maxRounds}.
  *
  * On success (last model turn has no {@code tool_calls}), appends a final {@see Role::Assistant} message
- * with that turn’s {@code content} (no {@see Message::$toolCalls}) so {@see Conversation} holds a full
- * replayable thread. If {@code $maxRounds} is reached while the latest completion still contains
+ * with that turn’s {@code content}, optional native {@code reasoning_content} when present in the completion payload,
+ * and without {@see Message::$toolCalls} so {@see Conversation} holds a full replayable thread. If {@code $maxRounds} is reached while the latest completion still contains
  * non-empty {@code tool_calls}, throws {@see RuntimeException} rather than inserting a fabricated reply.
  */
 final class ToolCallingLoop
@@ -69,6 +69,7 @@ final class ToolCallingLoop
                 Role::Assistant,
                 (string) ($assistantPayload['content'] ?? ''),
                 toolCalls: $toolCalls,
+                reasoningContent: $this->reasoningFromAssistantPayload($assistantPayload),
             ));
 
             foreach ($toolCalls as $toolCall) {
@@ -148,9 +149,20 @@ final class ToolCallingLoop
         $conversation->addMessage(new Message(
             Role::Assistant,
             (string) ($assistantPayload['content'] ?? ''),
+            reasoningContent: $this->reasoningFromAssistantPayload($assistantPayload),
         ));
 
         return $output;
+    }
+
+    /**
+     * @param array<string, mixed> $assistantPayload {@code choices[0].message}
+     */
+    private function reasoningFromAssistantPayload(array $assistantPayload): ?string
+    {
+        $raw = $assistantPayload['reasoning_content'] ?? null;
+
+        return Message::normalizeReasoningContent(is_string($raw) ? $raw : null);
     }
 
     /**

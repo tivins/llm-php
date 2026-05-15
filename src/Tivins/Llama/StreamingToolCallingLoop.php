@@ -22,7 +22,7 @@ use RuntimeException;
  *  3. Stops when no tool calls are present in the result or `$maxRounds` is exhausted.
  *
  * When the final stream round has no tool calls, appends that assistant turn to {@see $conversation}
- * (content only, no {@see Message::$toolCalls}) so the history matches the non-streaming loop.
+ * ({@code content} and optional native {@code reasoning_content} via {@see Message::$reasoningContent}, no {@see Message::$toolCalls}) so the history matches the non-streaming loop.
  * If `$maxRounds` is exhausted while the latest {@see StreamResult} still carries tool calls,
  * throws {@see RuntimeException}.
  */
@@ -72,6 +72,7 @@ final class StreamingToolCallingLoop
                 Role::Assistant,
                 $result->content,
                 toolCalls: $result->toolCalls,
+                reasoningContent: Message::normalizeReasoningContent($result->reasoningContent),
             ));
 
             foreach ($result->toolCalls as $toolCall) {
@@ -122,6 +123,7 @@ final class StreamingToolCallingLoop
         $conversation->addMessage(new Message(
             Role::Assistant,
             $result->content,
+            reasoningContent: Message::normalizeReasoningContent($result->reasoningContent),
         ));
 
         return $result;

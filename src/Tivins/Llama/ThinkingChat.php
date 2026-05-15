@@ -9,6 +9,9 @@ use JsonException;
 /**
  * Orchestrates two Lama calls: reasoning pass, then answer grounded in that trace.
  * Does not modify Lama.
+ *
+ * This is an application-level two-phase prompt pattern (extra user/system turns). It is **not** the same as
+ * a single assistant message carrying native {@code reasoning_content} from the chat-completions API (see {@see Message::$reasoningContent}).
  */
 class ThinkingChat
 {

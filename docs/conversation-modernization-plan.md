@@ -147,6 +147,8 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 
 **Objectif** : permettre à l’historique persisté en mémoire de refléter les champs que le backend peut renvoyer, en particulier **`reasoning_content`** sur les messages assistant, tout en restant compatible avec OpenAI-style chat completions.
 
+**Implémentation (2026-05-15)** : `Message::$reasoningContent` + `Message::normalizeReasoningContent()` (`null` et `''` → absent à la sérialisation). `Conversation::toChatCompletionMessages()` n’ajoute la clé JSON que pour les assistants lorsque la valeur est non vide. `ToolCallingLoop` lit `choices[0].message.reasoning_content` ; `StreamingToolCallingLoop` reprend `StreamResult::$reasoningContent`. Note PHPDoc sur `ThinkingChat`. Tests dans `tests/chat_completion_options_test.php`. Bump **1.15.0**.
+
 ### 3.1 Extension de `Message`
 
 - Ajouter un paramètre optionnel `?string $reasoningContent = null` (nom aligné sur la clé JSON `reasoning_content`).
@@ -164,9 +166,9 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 
 **Validation**
 
-- [ ] Tests unitaires `tests/chat_completion_options_test.php` ou nouveau fichier : `toChatCompletionMessages()` contient `reasoning_content` quand défini.
-- [ ] Test de non-régression : conversations sans reasoning inchangées.
-- [ ] Revue manuelle : `Lama::chatStream()` alimente déjà `StreamResult::$reasoningContent` — vérifier que ce champ peut être poussé dans le **message assistant final** après étape 2.
+- [x] Tests unitaires `tests/chat_completion_options_test.php` ou nouveau fichier : `toChatCompletionMessages()` contient `reasoning_content` quand défini.
+- [x] Test de non-régression : conversations sans reasoning inchangées.
+- [x] Revue manuelle : `Lama::chatStream()` alimente déjà `StreamResult::$reasoningContent` — vérifier que ce champ peut être poussé dans le **message assistant final** après étape 2.
 
 **Critère de passage** : tests verts ; exemple minimal (peut être interne au test) montrant assistant avec reasoning + content sérialisés correctement.
 
@@ -314,7 +316,7 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 | 0 | ☑ Terminé | Inventaire 2026-05-15 ; décisions JSONL + dossier logs — voir « Décisions à tracer » |
 | 1 | ☑ Terminé | DTO `src/Tivins/Llama/Dto/` ; `tests/turn_record_test.php` + fixtures JSON |
 | 2 | ☑ Terminé | Correction historique assistant final + erreur si `maxRounds` trop bas ; bump 1.14.0 |
-| 3 | ☐ Non démarré | |
+| 3 | ☑ Terminé | `reasoning_content` sur `Message` + sérialisation ; boucles outils ; bump 1.15.0 |
 | 4 | ☐ Non démarré | |
 | 5 | ☐ Non démarré | |
 | 6 | ☐ Non démarré | |

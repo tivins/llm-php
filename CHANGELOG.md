@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.15.0 — 2026-05-15
+
+- Feature: `Message` accepts optional native assistant `reasoning_content` (`Message::$reasoningContent`); `Message::normalizeReasoningContent()` treats `null` and `''` as absent for JSON output.
+- Feature: `Conversation::toChatCompletionMessages()` includes `reasoning_content` only on assistant messages when set (including tool-call rounds).
+- Feature: `ToolCallingLoop` and `StreamingToolCallingLoop` copy reasoning from `choices[0].message.reasoning_content` / `StreamResult::$reasoningContent` into conversation history.
+- Docs: `ThinkingChat` class doc clarifies two-phase prompting vs native `reasoning_content`.
+- Tests: `tests/chat_completion_options_test.php` covers reasoning serialization and empty-string normalization.
+
 ## 1.14.0 — 2026-05-15
 
 - **Behavior change:** `ToolCallingLoop::runUntilIdle()` appends the final assistant turn (without `tool_calls`) to `Conversation` so the stored thread matches replay to the API. If `$maxRounds` is exhausted while the latest completion still contains non-empty `tool_calls`, a `RuntimeException` is thrown (no fabricated reply).

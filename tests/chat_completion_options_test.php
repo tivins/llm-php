@@ -149,6 +149,47 @@ $assert(
     'tool turn serialization',
 );
 
+$reasonConv = new Conversation();
+$reasonConv->addMessage(new Message(Role::Assistant, 'Hello', reasoningContent: 'think'));
+$reasonMsgs = $reasonConv->toChatCompletionMessages();
+$assert(
+    $reasonMsgs === [
+        ['role' => 'assistant', 'content' => 'Hello', 'reasoning_content' => 'think'],
+    ],
+    'assistant reasoning_content serialized',
+);
+
+$reasonToolConv = new Conversation();
+$reasonToolConv->addMessage(new Message(
+    Role::Assistant,
+    '',
+    toolCalls: [
+        [
+            'id' => 'call_1',
+            'type' => 'function',
+            'function' => ['name' => 'read_file', 'arguments' => '{}'],
+        ],
+    ],
+    reasoningContent: 'plan tool',
+));
+$reasonToolMsgs = $reasonToolConv->toChatCompletionMessages();
+$assert(
+    isset($reasonToolMsgs[0]['reasoning_content'])
+        && $reasonToolMsgs[0]['reasoning_content'] === 'plan tool'
+        && $reasonToolMsgs[0]['content'] === null
+        && isset($reasonToolMsgs[0]['tool_calls']),
+    'assistant tool_calls plus reasoning_content',
+);
+
+$emptyReasonConv = new Conversation();
+$emptyReasonConv->addMessage(new Message(Role::Assistant, 'Hi', reasoningContent: ''));
+$emptyReasonMsgs = $emptyReasonConv->toChatCompletionMessages();
+$assert(
+    count($emptyReasonMsgs) === 1
+        && $emptyReasonMsgs[0] === ['role' => 'assistant', 'content' => 'Hi'],
+    'empty reasoning normalized away (matches conversation without reasoning)',
+);
+
 $skipEmptyToolChoice = new ChatCompletionOptions(tool_choice: '');
 $assert(!array_key_exists('tool_choice', $skipEmptyToolChoice->toRequestBody()), 'empty tool_choice omitted');
 
