@@ -20,6 +20,11 @@ use RuntimeException;
  *  2. If `finish_reason` is `"tool_calls"`, executes each tool via `$executeTool`, appends
  *     the assistant + tool messages to `$conversation`, then streams again.
  *  3. Stops when no tool calls are present in the result or `$maxRounds` is exhausted.
+ *
+ * When the final stream round has no tool calls, appends that assistant turn to {@see $conversation}
+ * (content only, no {@see Message::$toolCalls}) so the history matches the non-streaming loop.
+ * If `$maxRounds` is exhausted while the latest {@see StreamResult} still carries tool calls,
+ * throws {@see RuntimeException}.
  */
 final class StreamingToolCallingLoop
 {
@@ -34,9 +39,10 @@ final class StreamingToolCallingLoop
      * @param (callable(string, array<string, mixed>): void)|null $onToolCall  Optional observer invoked just before each tool is executed (e.g. for logging).
      * @param (callable(string): void)|null                     $onReasoningDelta Optional: receives each `reasoning_content` fragment ({@see Lama::chatStream()}).
      *
-     * @return StreamResult Last streaming result (from the final round that contained no tool calls, or the last round when `$maxRounds` is exhausted).
+     * @return StreamResult Last streaming result (final round with no tool calls).
      *
-     * @throws RuntimeException When `$maxRounds` is less than 1, or when JSON tool arguments are unparseable.
+     * @throws RuntimeException When `$maxRounds` is less than 1, when `$maxRounds` is exhausted while the assistant
+     *                            still returns tool calls, or when JSON tool arguments are unparseable.
      * @throws JsonException    From JSON helpers in this path.
      */
     public function runUntilIdle(
@@ -105,6 +111,18 @@ final class StreamingToolCallingLoop
         if ($result === null) {
             throw new RuntimeException('No stream result produced (maxRounds was 0)');
         }
+
+        if ($result->hasToolCalls()) {
+            throw new RuntimeException(
+                'Streaming tool calling loop exhausted $maxRounds while the assistant still returned tool_calls; '
+                . 'increase $maxRounds or inspect the stream result.',
+            );
+        }
+
+        $conversation->addMessage(new Message(
+            Role::Assistant,
+            $result->content,
+        ));
 
         return $result;
     }

@@ -11,6 +11,11 @@ use RuntimeException;
  * Runs OpenAI-style tool rounds: replays assistant messages with {@see Message::$toolCalls}, appends
  * {@see Role::Tool} results, and calls {@see Lama::chatCompletions} until the model returns no tool calls
  * or {@see self::runUntilIdle()} exhausts {@code $maxRounds}.
+ *
+ * On success (last model turn has no {@code tool_calls}), appends a final {@see Role::Assistant} message
+ * with that turn’s {@code content} (no {@see Message::$toolCalls}) so {@see Conversation} holds a full
+ * replayable thread. If {@code $maxRounds} is reached while the latest completion still contains
+ * non-empty {@code tool_calls}, throws {@see RuntimeException} rather than inserting a fabricated reply.
  */
 final class ToolCallingLoop
 {
@@ -28,7 +33,9 @@ final class ToolCallingLoop
      *
      * @return array<string, mixed> Last completion payload (same shape as {@see Lama::chatCompletions}).
      *
-     * @throws RuntimeException When a completion is missing {@code choices[0]}.
+     * @throws RuntimeException When a completion is missing {@code choices[0]},
+     *                            when `$maxRounds` is exhausted while the assistant still requests tools,
+     *                            or when `tool_calls` is not an array.
      * @throws JsonException From JSON helpers in this path (tool error payloads, request encoding in {@see Lama}).
      */
     public function runUntilIdle(
@@ -51,6 +58,9 @@ final class ToolCallingLoop
             }
 
             $toolCalls = $assistantPayload['tool_calls'] ?? [];
+            if (!is_array($toolCalls)) {
+                throw new RuntimeException('Chat completion choices[0].message.tool_calls must be an array when present');
+            }
             if ($toolCalls === []) {
                 break;
             }
@@ -118,6 +128,27 @@ final class ToolCallingLoop
         if (!$this->hasFirstChoice($output)) {
             throw new RuntimeException('Chat completion response missing choices[0] after tool loop');
         }
+
+        $assistantPayload = $output['choices'][0]['message'];
+        if (!is_array($assistantPayload)) {
+            throw new RuntimeException('Chat completion choices[0].message is not an array after tool loop');
+        }
+
+        $finalToolCalls = $assistantPayload['tool_calls'] ?? [];
+        if (!is_array($finalToolCalls)) {
+            throw new RuntimeException('Chat completion choices[0].message.tool_calls must be an array when present');
+        }
+        if ($finalToolCalls !== []) {
+            throw new RuntimeException(
+                'Tool calling loop exhausted $maxRounds while the assistant still returned tool_calls; '
+                . 'increase $maxRounds or inspect the completion payload.',
+            );
+        }
+
+        $conversation->addMessage(new Message(
+            Role::Assistant,
+            (string) ($assistantPayload['content'] ?? ''),
+        ));
 
         return $output;
     }

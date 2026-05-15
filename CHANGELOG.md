@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.14.0 — 2026-05-15
+
+- **Behavior change:** `ToolCallingLoop::runUntilIdle()` appends the final assistant turn (without `tool_calls`) to `Conversation` so the stored thread matches replay to the API. If `$maxRounds` is exhausted while the latest completion still contains non-empty `tool_calls`, a `RuntimeException` is thrown (no fabricated reply).
+- **Behavior change:** `StreamingToolCallingLoop::runUntilIdle()` mirrors the above: always appends the final `StreamResult` as a plain assistant message when no tool calls remain; otherwise throws when `$maxRounds` is exhausted with pending tools.
+- Tests: `tests/tool_calling_loop_test.php` extended (non-stream + streaming mocks, exhaustion case).
+
 ## 1.13.0 — 2026-05-15
 
 - Feature: logging / audit DTOs under `Tivins\Llama\Dto` — `StreamEventKind`, `StreamEvent`, `RawStreamTrace`, `RawChatCompletionResponse`, and `TurnRecord` (`forCompletion` / `forStream`, `toLogArray()` JSON-safe). Golden fixture test in `tests/turn_record_test.php`.

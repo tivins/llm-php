@@ -111,6 +111,8 @@ Tests pertinents pour la suite du plan :
 
 **Objectif** : corriger l’incohérence actuelle où **le message assistant final** (sans `tool_calls`) n’est **pas** ajouté à `Conversation` après `ToolCallingLoop::runUntilIdle()` et `StreamingToolCallingLoop::runUntilIdle()`.
 
+**Implémentation (2026-05-15)** : `ToolCallingLoop` et `StreamingToolCallingLoop` ajoutent le tour assistant final ; épuisement de `$maxRounds` avec encore des `tool_calls` → `RuntimeException`. Tests étendus dans `tests/tool_calling_loop_test.php` (fakes stream + exhaustion). Bump **1.14.0** — voir `CHANGELOG.md`.
+
 ### 2.1 Comportement attendu
 
 Après la boucle, `$conversation` doit contenir, dans l’ordre :
@@ -129,13 +131,13 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 
 - `content` vide mais `tool_calls` présents — inchangé pour les rounds intermédiaires.
 - Tour final : `content` vide et pas d’outils (rare) — ajouter quand même un message assistant cohérent avec le protocole OpenAI (`null` vs `''` selon ce que `Conversation::toChatCompletionMessages()` impose).
-- `maxRounds` atteint alors que le dernier résultat est encore `tool_calls` — documenter le comportement (ne pas inventer de message final fictif ; lever une exception ou retourner un état explicite selon politique du projet).
+- `maxRounds` atteint alors que le dernier résultat est encore `tool_calls` — **`RuntimeException`** explicite (message indiquant d’augmenter `$maxRounds` ou d’inspecter la charge utile / le `StreamResult`) ; aucun message assistant final inventé.
 
 **Validation**
 
-- [ ] Nouveaux tests dans `tests/tool_calling_loop_test.php` (ou fichier dédié) : après `runUntilIdle`, dernier message de `Conversation` est `Role::Assistant` et correspond au contenu du dernier choix / `StreamResult`.
-- [ ] Test miroir streaming vs non-streaming sur un scénario mocké ou fixture (si les tests actuels permettent mock `Lama`).
-- [ ] Exemples existants qui réutilisent la même `Conversation` sur plusieurs tours (ex. `workspace_tools_demo.php`) : vérifier manuellement ou via test d’intégration locale que l’historique n’est plus tronqué.
+- [x] Nouveaux tests dans `tests/tool_calling_loop_test.php` : après `runUntilIdle`, dernier message de `Conversation` est `Role::Assistant` sans `tool_calls` et correspond au contenu du dernier choix / `StreamResult`.
+- [x] Test miroir streaming vs non-streaming sur scénario mocké (`FakeLama` / `FakeStreamLama`).
+- [x] Exemples multi-tours réutilisant une `Conversation` (`examples/workspace_tools_demo.php`, etc.) : comportement compatible (aucun ajout manuel dupliquant le tour final nécessaire) — revue statique après correctif ; exécution locale optionnelle.
 
 **Critère de passage** : tests boucles verts ; comportement documenté dans PHPDoc des deux classes.
 
@@ -311,7 +313,7 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 |-------|--------|---------------------|
 | 0 | ☑ Terminé | Inventaire 2026-05-15 ; décisions JSONL + dossier logs — voir « Décisions à tracer » |
 | 1 | ☑ Terminé | DTO `src/Tivins/Llama/Dto/` ; `tests/turn_record_test.php` + fixtures JSON |
-| 2 | ☐ Non démarré | |
+| 2 | ☑ Terminé | Correction historique assistant final + erreur si `maxRounds` trop bas ; bump 1.14.0 |
 | 3 | ☐ Non démarré | |
 | 4 | ☐ Non démarré | |
 | 5 | ☐ Non démarré | |
