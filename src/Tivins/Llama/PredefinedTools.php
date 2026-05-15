@@ -188,7 +188,8 @@ class PredefinedTools
     {
         return new ChatFunctionTool(
             'apply_diff',
-            'Apply a unified diff using the patch program (must be installed and on PATH).',
+            'Apply a unified diff using the patch program (must be installed and on PATH). '
+            . 'Omit strip for automatic retries (detects Git-style paths vs plain filenames; handles common CRLF/LF mismatches on Windows).',
             [
                 'type' => 'object',
                 'properties' => [
@@ -202,8 +203,7 @@ class PredefinedTools
                     ],
                     'strip' => [
                         'type' => 'integer',
-                        'description' => 'Path strip count for patch -p (default 1).',
-                        'default' => 1,
+                        'description' => 'Path strip count for patch -p. Omit to auto-guess (-p1 for a/ prefixes, else -p0 first) and retry with fallbacks.',
                     ],
                 ],
                 'required' => ['diff', 'working_directory'],
@@ -829,30 +829,262 @@ class PredefinedTools
      */
     public static function applyDiff(array $parameters): array
     {
-        $diff = $parameters['diff'] ?? '';
+        $diffRaw = $parameters['diff'] ?? '';
         $cwd = $parameters['working_directory'] ?? '';
-        if (!is_string($diff) || $diff === '' || !is_string($cwd) || $cwd === '') {
+        if (!is_string($diffRaw) || $diffRaw === '' || !is_string($cwd) || $cwd === '') {
             return ['error' => 'diff and working_directory are required'];
         }
+
+        $diff = str_replace(["\r\n", "\r"], "\n", $diffRaw);
 
         $real = realpath($cwd);
         if ($real === false || !is_dir($real)) {
             return ['error' => 'working_directory is not a directory'];
         }
 
-        $strip = isset($parameters['strip']) ? (int) $parameters['strip'] : 1;
-        $strip = max(0, min(10, $strip));
+        $stripExplicit = null;
+        if (array_key_exists('strip', $parameters)) {
+            $s = filter_var($parameters['strip'], FILTER_VALIDATE_INT);
+            $stripExplicit = $s !== false ? max(0, min(10, $s)) : null;
+        }
 
-        $run = self::runProcess(['patch', '-p' . $strip, '--batch', '--forward'], $real, $diff);
-        if ($run['exit_code'] === 0) {
-            return ['ok' => true, 'stdout' => trim($run['stdout'])];
+        $candidateStrips = $stripExplicit !== null
+            ? self::uniqueInts(array_merge([$stripExplicit], self::fallbackStripCandidates($diff)))
+            : self::uniqueInts(array_merge(self::guessStripLevelsFromDiff($diff), range(0, 3)));
+
+        $useCrlf = self::diffTargetsAppearCrlfOnDisk($diff, $real);
+
+        /** @var list<array{label: string, patch: string, args: list<string>}> */
+        $strategies = [];
+        $strategies[] = ['label' => 'text', 'patch' => $diff, 'args' => ['patch', '--batch', '--forward']];
+        $strategies[] = [
+            'label' => 'ignore_space',
+            'patch' => $diff,
+            'args' => ['patch', '--batch', '--forward', '--ignore-whitespace'],
+        ];
+
+        if ($useCrlf) {
+            $crlfDiff = self::rewriteUnifiedDiffBodyForTargetNewlines($diff, "\r\n");
+            $strategies[] = ['label' => 'crlf_body', 'patch' => $crlfDiff, 'args' => ['patch', '--batch', '--forward']];
+            $strategies[] = [
+                'label' => 'crlf_body_ignore_ws',
+                'patch' => $crlfDiff,
+                'args' => ['patch', '--batch', '--forward', '--ignore-whitespace'],
+            ];
+        }
+
+        $lastReject = ['exit_code' => -1, 'stdout' => '', 'stderr' => ''];
+
+        foreach ($candidateStrips as $strip) {
+            foreach ($strategies as $strategy) {
+                $args = [...$strategy['args'], '-p' . $strip];
+                $run = self::runProcess($args, $real, $strategy['patch']);
+
+                $lastReject = [
+                    'exit_code' => $run['exit_code'],
+                    'stdout' => trim($run['stdout']),
+                    'stderr' => trim($run['stderr']),
+                ];
+
+                if ($run['exit_code'] === 0) {
+                    $applied = trim($run['stdout']);
+                    return [
+                        'ok' => true,
+                        'stdout' => $applied !== '' ? $applied : 'patch succeeded',
+                        'strip_used' => $strip,
+                        'strategy' => $strategy['label'],
+                    ];
+                }
+            }
         }
 
         return [
             'ok' => false,
-            'exit_code' => $run['exit_code'],
-            'stdout' => trim($run['stdout']),
-            'stderr' => trim($run['stderr']),
+            'exit_code' => $lastReject['exit_code'],
+            'stdout' => $lastReject['stdout'],
+            'stderr' => $lastReject['stderr'],
+            'hints' => self::patchFailureHints(),
+        ];
+    }
+
+    /**
+     * @param list<int> $ints
+     * @return list<int>
+     */
+    private static function uniqueInts(array $ints): array
+    {
+        $seen = [];
+        $out = [];
+        foreach ($ints as $v) {
+            if (isset($seen[$v])) {
+                continue;
+            }
+            $seen[$v] = true;
+            $out[] = $v;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function fallbackStripCandidates(string $diff): array
+    {
+        $guess = self::guessStripLevelsFromDiff($diff);
+
+        return self::uniqueInts(array_merge($guess, [0, 1, 2, 3]));
+    }
+
+    /**
+     * Inspect unified diff paths to order plausible -p strip counts (fewer guesses first).
+     *
+     * @return list<int>
+     */
+    private static function guessStripLevelsFromDiff(string $diffLf): array
+    {
+        $paths = self::pathsFromUnifiedDiffPaths($diffLf);
+        foreach ($paths as $rel) {
+            if (preg_match('#^(?:a|b)/.+#', $rel) === 1) {
+                return [1, 0, 2];
+            }
+            if (str_contains($rel, '/') || str_contains($rel, '\\')) {
+                return [1, 0, 2];
+            }
+            if ($rel !== '') {
+                return [0, 1];
+            }
+        }
+
+        return [0, 1, 2];
+    }
+
+    /**
+     * Paths from unified diff "---" lines (preferred for heuristic; skips /dev/null).
+     *
+     * @return list<string>
+     */
+    private static function pathsFromUnifiedDiffPaths(string $diffLf): array
+    {
+        preg_match_all('/^--- (.+)$/m', $diffLf, $m);
+
+        /** @var list<string> */
+        $out = [];
+        if (!isset($m[1]) || !is_array($m[1])) {
+            return $out;
+        }
+
+        foreach ($m[1] as $rawLine) {
+            if (!is_string($rawLine)) {
+                continue;
+            }
+
+            // Use the first tab-separated field (GNU diff appends mtime after a tab on the same line).
+            $firstField = preg_split("#\t#", $rawLine, 2)[0] ?? $rawLine;
+            $pathTrim = trim($firstField);
+            if (preg_match('#^"(.+)"$#', $pathTrim, $q) === 1 && isset($q[1])) {
+                $pathTrim = $q[1];
+            }
+
+            $pathTrim = ltrim(str_replace('\\', '/', $pathTrim));
+
+            if ($pathTrim === '' || str_starts_with($pathTrim, '/dev/null')) {
+                continue;
+            }
+
+            $out[] = $pathTrim;
+        }
+
+        return $out;
+    }
+
+    /**
+     * True if some target files under cwd look CRLF-encoded (inspect first path found in "---" headers).
+     */
+    private static function diffTargetsAppearCrlfOnDisk(string $diffLf, string $workingReal): bool
+    {
+        foreach (self::pathsFromUnifiedDiffPaths($diffLf) as $rel) {
+            /** @var list<string> */
+            $candidates = [];
+
+            $candidates[] = $workingReal . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rel);
+            if (preg_match('#^(?:a|b)/(.*)$#D', $rel, $nm) === 1 && isset($nm[1])) {
+                $candidates[] = $workingReal . DIRECTORY_SEPARATOR
+                    . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $nm[1]);
+            }
+
+            foreach ($candidates as $absolute) {
+                if (!is_file($absolute)) {
+                    continue;
+                }
+                $sample = file_get_contents($absolute, false, null, 0, 8192);
+
+                return is_string($sample) && str_contains($sample, "\r\n");
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Embed CRLF inside hunk payload lines while keeping LF record separators — helps patch against CRLF-on-disk targets.
+     */
+    private static function rewriteUnifiedDiffBodyForTargetNewlines(string $diffLf, string $newline): string
+    {
+        if ($newline !== "\r\n") {
+            return $diffLf;
+        }
+
+        /** @var list<string> */
+        $built = [];
+        $lines = explode("\n", $diffLf);
+        $lastIndex = count($lines) - 1;
+
+        foreach ($lines as $i => $line) {
+            $isMeta = $line !== '' && (
+                str_starts_with($line, 'diff --git ')
+                || str_starts_with($line, '--- ')
+                || str_starts_with($line, '+++ ')
+                || str_starts_with($line, '@@ ')
+                || str_starts_with($line, '\\')
+            );
+
+            $isPayload = !$isMeta
+                && (
+                    (($line[0] ?? '') === ' ' || ($line[0] ?? '') === '+' || ($line[0] ?? '') === '-')
+                    && !str_starts_with($line, '--- ')
+                    && !str_starts_with($line, '+++ ')
+                );
+
+            if ($line === '' && $i === $lastIndex) {
+                $built[] = '';
+
+                continue;
+            }
+
+            if ($isPayload) {
+                $prefix = $line[0];
+                $rest = substr($line, 1);
+                $built[] = "{$prefix}{$rest}\r\n";
+
+                continue;
+            }
+
+            $built[] = $line !== '' || $i < $lastIndex ? "{$line}\n" : '';
+        }
+
+        return implode('', $built);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function patchFailureHints(): array
+    {
+        return [
+            'Paths in ---/+++ lines without a/subdir prefixes usually need strip 0 (-p0); omit strip to retry automatically.',
+            'If editing on Windows with CRLF, the library retries with CRLF-sized hunk lines; still ensure context matches.',
+            '`--ignore-whitespace` is tried as a fallback when strict context fails.',
         ];
     }
 

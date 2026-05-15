@@ -181,6 +181,65 @@ if (is_array($patchJson) && ($patchJson['ok'] ?? false) === true) {
     $assert(is_array($patchJson), 'apply_diff should always return a JSON object describing outcome');
 }
 @unlink($pFile);
+
+$patchPlainDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'predefined_tools_patch_plain_' . uniqid('', true);
+mkdir($patchPlainDir, 0700, true);
+$pPlain = $patchPlainDir . DIRECTORY_SEPARATOR . 'bare_name.txt';
+file_put_contents($pPlain, "a\n");
+$bareUnified = <<<DIFF
+--- bare_name.txt
++++ bare_name.txt
+@@ -1 +1 @@
+-a
++b
+DIFF;
+$bareOut = json_decode((string) PredefinedTools::runTool('apply_diff', [
+    'diff' => $bareUnified,
+    'working_directory' => $patchPlainDir,
+]), true);
+
+if (is_array($bareOut) && ($bareOut['ok'] ?? false) === true) {
+    $assert(
+        trim((string) file_get_contents($pPlain)) === 'b',
+        'apply_diff without strip should apply bare-filename unified diff via auto -p',
+    );
+    $assert(
+        isset($bareOut['strip_used'], $bareOut['strategy']),
+        'apply_diff success should report strip_used and strategy',
+    );
+} else {
+    $assert(is_array($bareOut), 'apply_diff bare path should return JSON payload');
+}
+@unlink($pPlain);
+@rmdir($patchPlainDir);
+
+$crlfDir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'predefined_tools_patch_crlf_' . uniqid('', true);
+mkdir($crlfDir, 0700, true);
+$pCrlf = $crlfDir . DIRECTORY_SEPARATOR . 'crlf_target.txt';
+file_put_contents($pCrlf, "a\r\n");
+$crlfUnified = <<<DIFF
+--- crlf_target.txt
++++ crlf_target.txt
+@@ -1 +1 @@
+-a
++b
+DIFF;
+$crlfOut = json_decode((string) PredefinedTools::runTool('apply_diff', [
+    'diff' => $crlfUnified,
+    'working_directory' => $crlfDir,
+]), true);
+
+if (is_array($crlfOut) && ($crlfOut['ok'] ?? false) === true) {
+    $assert(
+        str_replace("\r\n", "\n", (string) file_get_contents($pCrlf)) === "b\n",
+        'apply_diff should handle CRLF on-disk targets when patch is available',
+    );
+} else {
+    $assert(is_array($crlfOut), 'apply_diff CRLF case should return JSON payload');
+}
+@unlink($pCrlf);
+@rmdir($crlfDir);
+
 @rmdir($patchDir);
 
 if ($failed !== 0) {

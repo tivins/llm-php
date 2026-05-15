@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.12.0 — 2026-05-15
+
+- Feature: `apply_diff` — normalise les fins de ligne du diff en entrée, devine une liste de niveaux `-p` (chemins type `a/b` vs noms simples), enchaîne des tentatives (`strip` peut être omis ; si fourni, ce niveau est essayé en premier puis des repli). Essaie ensuite `--ignore-whitespace` ; si une cible sur disque est en CRLF, réécrit les lignes de hunk avec `\r` avant d’autres essais.
+- Succès : ajout optionnel dans la charge utile JSON de **`strip_used`** et **`strategy`**. Échecs : **`hints`** (conseils côté appelant).
+- Tests: couverture `-p` auto sur diff sans préfixe `a/`/`b/`, et cible fichier CRLF.
+- Docs: `examples/workspace_tools_demo.php` — rappel d’omettre `strip` quand c’est pertinent.
+
+## 1.11.1 — 2026-05-15
+
+- Docs: `examples/workspace_tools_demo.php` — démo `read_file` / `write_file` / `grep` / `apply_diff` avec sandbox sur un répertoire passé en argument ; vérifie la présence de `patch` sur le PATH (Windows : message orientant vers Git Bash/WSL).
+
 ## 1.11.0 — 2026-05-14
 
 - Feature: `fetch_web_page` returns **plain visible text by default** for HTML/XHTML (scripts/styles/noscript/template stripped, entities decoded, whitespace normalized); tool arg **`raw_html`** (default `false`) restores raw response bytes. Responses include boolean **`text_extracted`** indicating whether plaintext conversion ran.
