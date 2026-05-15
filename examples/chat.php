@@ -5,6 +5,8 @@ declare(strict_types=1);
 /**
  * Interactive streamed chat with optional JSONL audit log.
  *
+ * Streams assistant **reply** tokens to stdout and native **{@code reasoning_content}** chunks to stderr when the backend provides them ({@see \Tivins\Llama\HumanTurnStreamDisplay} + {@see example_render_options_from_env()}).
+ *
  * Set {@code TIVINS_LLAMA_CONVERSATION_LOG} to a path (e.g. {@code examples/logs/chat.session.jsonl}) to append one JSON line per user turn:
  * each line is a {@see \Tivins\Llama\Dto\TurnRecord} in stream mode with {@see \Tivins\Llama\Dto\RawStreamTrace::$rawDataLines} holding verbatim SSE JSON payloads (event replay via {@see \Tivins\Llama\Dto\StreamEvent} is optional / empty here).
  */
@@ -14,6 +16,7 @@ use Tivins\Llama\ChatCompletionOptions;
 use Tivins\Llama\Conversation;
 use Tivins\Llama\Dto\RawStreamTrace;
 use Tivins\Llama\Dto\TurnRecord;
+use Tivins\Llama\HumanTurnStreamDisplay;
 use Tivins\Llama\Lama;
 use Tivins\Llama\Message;
 use Tivins\Llama\Role;
@@ -40,7 +43,14 @@ try {
 
 
     $update_session = function () use ($streamConv, $session_file): void {
-        $messages = array_map(static fn (Message $m): array => ['role' => $m->role->value, 'content' => $m->content], $streamConv->getMessages());
+        $messages = array_map(static function (Message $m): array {
+            $row = ['role' => $m->role->value, 'content' => $m->content];
+            if ($m->reasoningContent !== null) {
+                $row['reasoning_content'] = $m->reasoningContent;
+            }
+
+            return $row;
+        }, $streamConv->getMessages());
         file_put_contents($session_file, json_encode($messages, JSON_PRETTY_PRINT));
     };
     $update_session();
@@ -56,21 +66,18 @@ try {
         $update_session();
 
         echo 'Bot> ';
-        $fullStream = '';
         $opts = new ChatCompletionOptions(temperature: 0.7, top_p: 0.95);
         $capture = new SsePayloadCapture();
+        $streamDisplay = new HumanTurnStreamDisplay(example_render_options_from_env());
         $streamResult = $lama->chatStream(
             $streamConv,
-            static function (string $delta) use (&$fullStream): void {
-                $fullStream .= $delta;
-                echo $delta;
-            },
+            $streamDisplay->onDelta(...),
             $opts,
             null,
-            null,
+            $streamDisplay->onReasoningDelta(...),
             $capture,
         );
-        echo "\n\n";
+        fwrite(STDOUT, "\n");
 
         if ($logger !== null) {
             $turnId = $streamResult->id ?? uniqid('stream_', true);
@@ -82,7 +89,11 @@ try {
             ));
         }
 
-        $streamConv->addMessage(new Message(Role::Assistant, $fullStream));
+        $streamConv->addMessage(new Message(
+            Role::Assistant,
+            $streamResult->content,
+            reasoningContent: $streamResult->reasoningContent,
+        ));
         $update_session();
     }
 } catch (\Exception $e) {

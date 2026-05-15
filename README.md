@@ -73,7 +73,7 @@ Optional audit logs use **`TurnJsonlLogger`** (`Tivins\Llama\TurnJsonlLogger`): 
 
 ## Human-readable console output (`HumanTurnRenderer`)
 
-**`HumanTurnRenderer`** renders **`NormalizedTurnOutcome`** or **`TurnRecord`** (replay from JSONL) with reasoning on stderr by default. Streamed demos use **`HumanTurnStreamDisplay`** with the same channel split.
+**`HumanTurnRenderer`** renders **`NormalizedTurnOutcome`** or **`TurnRecord`** (replay from JSONL) with reasoning on stderr by default. **`examples/stream_*_chain.php`** and **`examples/chat.php`** use **`HumanTurnStreamDisplay`** for streamed reply tokens and reasoning deltas (options from **`example_render_options_from_env()`**).
 
 In examples, **`print_output()`** delegates to **`HumanTurnRenderer::renderCompletionPayload()`** after **`examples/.env`** is loaded. **`TIVINS_LLAMA_COMPLETION_DUMP_RAW=1`** restores the verbose legacy diagnostics. **`TIVINS_LLAMA_NO_ANSI=1`** and **`TIVINS_LLAMA_REASONING_STDOUT=1`** tweak colours and where reasoning prints (via **`example_render_options_from_env()`**).
 

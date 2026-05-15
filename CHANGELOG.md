@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.18.1 — 2026-05-15
+
+- Examples: `examples/chat.php` shows streamed `reasoning_content` via `HumanTurnStreamDisplay`; session JSON persists optional `reasoning_content` on assistant messages.
+
 ## 1.18.0 — 2026-05-15
 
 - Feature: `RenderOptions`, `HumanTurnRenderer` (`renderNormalized`, `renderCompletionPayload`, `renderTurnRecord`), and `HumanTurnStreamDisplay` unify console output (stderr for streamed reasoning/tool fragments by default; optional ANSI; injectable stdout/stderr for tests).
