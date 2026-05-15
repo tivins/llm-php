@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Tivins\Llama\ChatCompletionOptions;
 use Tivins\Llama\Dto\RawChatCompletionResponse;
 use Tivins\Llama\Dto\TurnRecord;
+use Tivins\Llama\HumanTurnRenderer;
+use Tivins\Llama\RenderOptions;
 use Tivins\Llama\TurnJsonlLogger;
 
 /**
@@ -106,34 +108,126 @@ function example_log_completion_turn(?TurnJsonlLogger $logger, array $payload, ?
     ));
 }
 
-function print_output(array $output): void
+/**
+ * Resolved after {@see example_load_examples_env_file()} (does not overwrite already-set getenv values).
+ *
+ * - {@code TIVINS_LLAMA_NO_ANSI}=1/true/yes: disable ANSI in {@see HumanTurnRenderer} / {@see HumanTurnStreamDisplay}.
+ * - {@code TIVINS_LLAMA_REASONING_STDOUT}=1/true/yes: print reasoning blocks on stdout instead of stderr (non-stream and stream summaries).
+ *
+ * Omit both to mirror default console demos (ANSI on unless your terminal cannot render escapes; streamed reasoning mirrors stderr tooling output).
+ */
+function example_render_options_from_env(): RenderOptions
+{
+    example_load_examples_env_file();
+
+    static $truthy = static function (?string $v): bool {
+        if ($v === false || $v === null || $v === '') {
+            return false;
+        }
+        $t = strtolower(trim($v));
+
+        return in_array($t, ['1', 'true', 'yes', 'on'], true);
+    };
+
+    $noAnsi = $truthy(getenv('TIVINS_LLAMA_NO_ANSI') !== false ? (string) getenv('TIVINS_LLAMA_NO_ANSI') : null);
+
+    return new RenderOptions(
+        ansiColors: !$noAnsi,
+        reasoningOnStderr: !$truthy(
+            getenv('TIVINS_LLAMA_REASONING_STDOUT') !== false ? (string) getenv('TIVINS_LLAMA_REASONING_STDOUT') : null,
+        ),
+    );
+}
+
+/** When truthy ({@code 1/true/yes/on}), {@see print_output()} prints the verbose legacy diagnostics instead of {@see HumanTurnRenderer}. */
+function example_completion_dump_raw_requested(): bool
+{
+    example_load_examples_env_file();
+
+    static $truthy = static function (?string $v): bool {
+        if ($v === false || $v === null || $v === '') {
+            return false;
+        }
+        $t = strtolower(trim($v));
+
+        return in_array($t, ['1', 'true', 'yes', 'on'], true);
+    };
+
+    return $truthy(getenv('TIVINS_LLAMA_COMPLETION_DUMP_RAW') !== false ? (string) getenv('TIVINS_LLAMA_COMPLETION_DUMP_RAW') : null);
+}
+
+/**
+ * Verbose diagnostics for non-stream chat completions payloads (token usage per field, booleans).
+ * Prefer {@see print_output()} ({@see HumanTurnRenderer}) unless debugging wire shapes.
+ *
+ * @param array<string, mixed> $output
+ */
+function print_completion_payload_debug(array $output): void
 {
     echo "\n-----------------------------------------Response-----------------------------------------\n";
+
+    $usage = isset($output['usage']) && is_array($output['usage']) ? $output['usage'] : null;
     echo "Usage:\n";
-    echo "- Prompt tokens: " . $output['usage']['prompt_tokens'] . "\n";
-    echo "- Completion tokens: " . $output['usage']['completion_tokens'] . "\n";
-    echo "- Total tokens: " . $output['usage']['total_tokens'] . "\n";
+    if ($usage !== null) {
+        echo "- Prompt tokens: " . ($usage['prompt_tokens'] ?? '?') . "\n";
+        echo "- Completion tokens: " . ($usage['completion_tokens'] ?? '?') . "\n";
+        echo "- Total tokens: " . ($usage['total_tokens'] ?? '?') . "\n";
+    } else {
+        echo "- (no usage block)\n";
+    }
 
     echo "\n";
-    echo "Choices count: " . count($output['choices']) . "\n";
-    foreach ($output['choices'] as $choice) {
+    $choices = isset($output['choices']) && is_array($output['choices']) ? $output['choices'] : [];
+    echo "Choices count: " . count($choices) . "\n";
+    foreach ($choices as $choice) {
+        if (!is_array($choice)) {
+            continue;
+        }
         $finishReason = $choice['finish_reason'] ?? 'unknown';
         $isStop = $finishReason === 'stop';
         $isToolCall = $finishReason === 'tool_calls';
-        $content = $choice['message']['content'] ?? 'unknown';
+        $message = isset($choice['message']) && is_array($choice['message']) ? $choice['message'] : [];
+        $content = array_key_exists('content', $message) ? $message['content'] : 'unknown';
+        if (!is_string($content)) {
+            $encoded = json_encode($content, JSON_UNESCAPED_UNICODE);
+            $content = $encoded !== false ? $encoded : '?';
+        }
         $index = $choice['index'] ?? 0;
-        $hasReasoningContent = isset($choice['message']['reasoning_content']);
-        $reasoningContent = $choice['message']['reasoning_content'] ?? 'unknown';
+        $hasReasoningContent = isset($message['reasoning_content']);
+        $reasoningContent = array_key_exists('reasoning_content', $message) ? $message['reasoning_content'] : 'unknown';
+        if (!is_string($reasoningContent)) {
+            $encoded = json_encode($reasoningContent, JSON_UNESCAPED_UNICODE);
+            $reasoningContent = $encoded !== false ? $encoded : '?';
+        }
 
-        echo "-- Choice " . ($index + 1) . " --\n";
+        echo "-- Choice " . ((int) $index + 1) . " --\n";
         echo "- Is stop: " . ($isStop ? 'yes' : 'no') . "\n";
         echo "- Finish reason: " . $finishReason . "\n";
         echo "- Is tool call: " . ($isToolCall ? 'yes' : 'no') . "\n";
         echo "- Content: " . $content . "\n";
-        echo "- Tool calls: " . json_encode($choice['message']['tool_calls'] ?? []) . "\n";
-        echo "- Has reasoning content: " . ($hasReasoningContent ? 'yes' : 'no') . "\n";
-        echo "- Reasoning content: " . $reasoningContent . "\n";
+        echo '- Tool calls: ' . json_encode($message['tool_calls'] ?? []) . "\n";
+        echo '- Has reasoning content: ' . ($hasReasoningContent ? 'yes' : 'no') . "\n";
+        echo '- Reasoning content: ' . $reasoningContent . "\n";
         echo "\n";
     }
     echo "-----------------------------------------End of Response-----------------------------------------\n\n";
+}
+
+/**
+ * Human-readable rendering of a chat completion JSON payload via {@see HumanTurnRenderer::renderCompletionPayload()}.
+ *
+ * Set {@code TIVINS_LLAMA_COMPLETION_DUMP_RAW=1} (or {@code true}) to print the legacy verbose layout from
+ * {@see print_completion_payload_debug()} instead --- useful when inspecting multi-field wire shapes.
+ *
+ * @param array<string, mixed> $output Decoded response from {@see \Tivins\Llama\Lama::chatCompletions()}.
+ */
+function print_output(array $output): void
+{
+    if (example_completion_dump_raw_requested()) {
+        print_completion_payload_debug($output);
+
+        return;
+    }
+
+    HumanTurnRenderer::renderCompletionPayload($output, example_render_options_from_env());
 }

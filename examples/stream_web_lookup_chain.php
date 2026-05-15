@@ -21,6 +21,8 @@ declare(strict_types=1);
  *
  * Journal JSONL (optionnel) : {@code TIVINS_LLAMA_CONVERSATION_LOG} — une ligne par tour assistant stream (voir {@see example_turn_jsonl_logger_from_env()} dans {@code examples/_helpers.php}).
  *
+ * Sortie console : {@see \Tivins\Llama\HumanTurnStreamDisplay} avec {@see example_render_options_from_env()}.
+ *
  * Usage: php examples/stream_web_lookup_chain.php
  */
 
@@ -30,6 +32,7 @@ use Tivins\Llama\ChatFunctionTool;
 use Tivins\Llama\Conversation;
 use Tivins\Llama\Dto\RawStreamTrace;
 use Tivins\Llama\Dto\TurnRecord;
+use Tivins\Llama\HumanTurnStreamDisplay;
 use Tivins\Llama\Lama;
 use Tivins\Llama\Message;
 use Tivins\Llama\PredefinedTools;
@@ -80,39 +83,18 @@ $options = new ChatCompletionOptions(tools: $toolSchemas, tool_choice: 'auto');
 
 $logger = example_turn_jsonl_logger_from_env();
 
+$streamDisplay = new HumanTurnStreamDisplay(example_render_options_from_env());
+
 try {
-    $lastDeltaSource = '';
     (new StreamingToolCallingLoop($lama))->runUntilIdle(
         conversation: $conversation,
         options: $options,
-        onDelta: static function (string $delta) use (&$lastDeltaSource): void {
-            if ($lastDeltaSource !== 'delta') {
-                echo "\n";
-            }
-            $lastDeltaSource = 'delta';
-            echo $delta;
-            flush();
-        },
+        onDelta: $streamDisplay->onDelta(...),
         executeTool: PredefinedTools::runTool(...),
         maxRounds: 16,
-        onToolCall: static function (string $name, array $args) use (&$lastDeltaSource): void {
-            fwrite(STDERR, "\n[tool] " . $name . ' ' . json_encode($args) . "\n");
-            $lastDeltaSource = 'tool';
-        },
-        onToolCallChunk: static function (int $index, string $fragment) use (&$lastDeltaSource): void {
-            if ($lastDeltaSource !== 'tool') {
-                echo "\n";
-            }
-            fwrite(STDERR, "\e[32m$fragment\e[0m");
-            $lastDeltaSource = 'tool';
-        },
-        onReasoningDelta: static function (string $s) use (&$lastDeltaSource): void {
-            if ($lastDeltaSource !== 'reasoning') {
-                echo "\n";
-            }
-            $lastDeltaSource = 'reasoning';
-            fwrite(STDERR, "\e[33m$s\e[0m");
-        },
+        onToolCall: $streamDisplay->onToolCall(...),
+        onToolCallChunk: $streamDisplay->onToolArgumentChunk(...),
+        onReasoningDelta: $streamDisplay->onReasoningDelta(...),
         onAssistantStreamRound: static function (StreamResult $result, RawStreamTrace $trace, int $roundIdx) use ($logger, $options): void {
             if ($logger === null) {
                 return;

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.18.0 — 2026-05-15
+
+- Feature: `RenderOptions`, `HumanTurnRenderer` (`renderNormalized`, `renderCompletionPayload`, `renderTurnRecord`), and `HumanTurnStreamDisplay` unify console output (stderr for streamed reasoning/tool fragments by default; optional ANSI; injectable stdout/stderr for tests).
+- Examples: `print_output()` routes through `HumanTurnRenderer`; `TIVINS_LLAMA_COMPLETION_DUMP_RAW` selects verbose legacy dumps; optional `example_render_options_from_env()` knobs (`TIVINS_LLAMA_NO_ANSI`, `TIVINS_LLAMA_REASONING_STDOUT`); `examples/stream_*_chain.php` use `HumanTurnStreamDisplay`.
+- Docs: README human-output section; `examples/.env` documents the new variables.
+- Tests: `tests/human_turn_renderer_test.php`.
+
 ## 1.17.1 — 2026-05-15
 
 - Examples: `examples/.env` with default `TIVINS_LLAMA_CONVERSATION_LOG`, loaded from `examples/_helpers.php` via `example_load_examples_env_file()` (does not override an already-set environment variable).

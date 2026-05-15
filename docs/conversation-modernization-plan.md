@@ -265,10 +265,14 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 
 **Validation**
 
-- [ ] Sortie lisible sur Windows (PowerShell) et conventions ANSI — documenter limitations si nécessaire.
-- [ ] Au moins un test snapshot faible (chaîne normalisée sans couleurs) ou test manuel checklist dans README.
+- [x] Sortie lisible sur Windows (PowerShell) et conventions ANSI — documenter limitations si nécessaire (voir README + `examples/.env`; consoles sans VT : activer **`TIVINS_LLAMA_NO_ANSI`**).
+- [x] Au moins un test snapshot faible (chaîne normalisée sans couleurs) ou test manuel checklist dans README — **`tests/human_turn_renderer_test.php`** + courte note README.
 
 **Critère de passage** : exemples migrés utilisent le renderer au lieu de logique dupliquée (`lastDeltaSource`, etc.) où c’est raisonnable.
+
+**Implémentation (2026-05-15)** : `RenderOptions`, `HumanTurnRenderer`, `HumanTurnStreamDisplay` sous `src/Tivins/Llama/` ; `examples/_helpers.php` — `print_output()` → `HumanTurnRenderer::renderCompletionPayload()` avec **opt-out** **`TIVINS_LLAMA_COMPLETION_DUMP_RAW`** vers `print_completion_payload_debug()` (ancienne sortie prolixe pour debug brut, § 6.3) ; **`example_render_options_from_env()`** pour ANSI / canal reasoning ; exemples **`stream_tools_chain.php`** et **`stream_web_lookup_chain.php`** branchés sur `HumanTurnStreamDisplay`. Bump **1.18.0**.
+
+**Décision § 6.3** : comportement canonique = **`HumanTurnRenderer`** pour `print_output` ; dump historique **`print_completion_payload_debug()`** réservé à la variable **`TIVINS_LLAMA_COMPLETION_DUMP_RAW`**.
 
 ---
 
@@ -325,7 +329,7 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 | 3 | ☑ Terminé | `reasoning_content` sur `Message` + sérialisation ; boucles outils ; bump 1.15.0 |
 | 4 | ☑ Terminé | `NormalizedTurnOutcome` + `ChatStreamAccumulator` ; `StreamResult` usage/model/id ; tests + fixture SSE ; bump 1.16.0 |
 | 5 | ☑ Terminé | `TurnJsonlLogger`, `SsePayloadCapture`, exemples + README ; bump 1.17.0 |
-| 6 | ☐ Non démarré | |
+| 6 | ☑ Terminé | `HumanTurnRenderer`, `HumanTurnStreamDisplay`, `print_output` + env (**`TIVINS_LLAMA_COMPLETION_DUMP_RAW`**, **`TIVINS_LLAMA_NO_ANSI`**…); exemples stream migrés ; tests `human_turn_renderer_test.php` ; bump 1.18.0 |
 | 7 | ☐ Non démarré | |
 
 ---
