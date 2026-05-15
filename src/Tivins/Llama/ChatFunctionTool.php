@@ -37,4 +37,20 @@ final readonly class ChatFunctionTool
             ],
         ];
     }
+
+    /**
+     * Serialise several {@see ChatFunctionTool} instances into the `tools` array for {@see ChatCompletionOptions}.
+     *
+     * @param iterable<int|string, self> $tools
+     * @return list<array{type: string, function: array{name: string, description: string, parameters: array<string, mixed>}}>
+     */
+    public static function toToolArrays(iterable $tools): array
+    {
+        $out = [];
+        foreach ($tools as $tool) {
+            $out[] = $tool->toToolArray();
+        }
+
+        return $out;
+    }
 }

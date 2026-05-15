@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.12.2 — 2026-05-15
+
+- Feature: `ChatFunctionTool::toToolArrays(iterable)` builds the OpenAI `tools` payload from several tools (examples updated).
+
 ## 1.12.1 — 2026-05-15
 
 - Fix: `apply_diff` appends a final newline to the unified diff before invoking `patch`, avoiding spurious “ends in middle of line” warnings on some GNU patch builds.

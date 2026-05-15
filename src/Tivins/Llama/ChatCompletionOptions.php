@@ -42,7 +42,7 @@ final class ChatCompletionOptions
      * @param ?int $seed If supported, fixes the random seed for reproducible sampling (integer).
      * @param string|list<string>|null $stop One or more stop sequences. Empty string or empty list is treated as “not set”.
      * @param ?int $n How many chat completion choices to generate. Note: {@see Lama::chat()} still reads only the first choice.
-     * @param list<array<string, mixed>>|null $tools OpenAI `tools` array; use {@see ChatFunctionTool::toToolArray()} per function. Empty list is omitted.
+     * @param list<array<string, mixed>>|null $tools OpenAI `tools` array; use {@see ChatFunctionTool::toToolArrays()} or {@see ChatFunctionTool::toToolArray()} per function. Empty list is omitted.
      * @param string|array<string, mixed>|null $tool_choice e.g. `'auto'`, `'none'`, `'required'`, or a forcing object `['type' => 'function', 'function' => ['name' => '…']]`. Empty string is omitted.
      */
     public function __construct(

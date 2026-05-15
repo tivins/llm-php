@@ -242,10 +242,7 @@ $tools = [
     PredefinedTools::getApplyDiffTool(),
 ];
 
-$toolSchemas = array_map(
-    static fn (ChatFunctionTool $tool): array => $tool->toToolArray(),
-    $tools,
-);
+$toolSchemas = ChatFunctionTool::toToolArrays($tools);
 
 $workspaceForwardSlashes = str_replace('\\', '/', $workspaceReal);
 

@@ -41,13 +41,10 @@ require __DIR__ . '/_helpers.php';
 
 $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
 
-$toolSchemas = array_map(
-    static fn (ChatFunctionTool $tool): array => $tool->toToolArray(),
-    [
-        PredefinedTools::getWebSearchTool(),
-        PredefinedTools::getFetchWebPageTool(),
-    ],
-);
+$toolSchemas = ChatFunctionTool::toToolArrays([
+    PredefinedTools::getWebSearchTool(),
+    PredefinedTools::getFetchWebPageTool(),
+]);
 
 $systemPrompt = BehaviorPrompts::HELPFUL . <<<'TEXT'
 

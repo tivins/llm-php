@@ -100,6 +100,15 @@ $assert(
     'tool function name',
 );
 
+$assert(ChatFunctionTool::toToolArrays([]) === [], 'toToolArrays empty');
+$a = new ChatFunctionTool('a', 'da', ['type' => 'object', 'properties' => []]);
+$b = new ChatFunctionTool('b', 'db', ['type' => 'object', 'properties' => []]);
+$batch = ChatFunctionTool::toToolArrays(['x' => $a, 'y' => $b]);
+$assert(
+    count($batch) === 2 && $batch[0]['function']['name'] === 'a' && $batch[1]['function']['name'] === 'b',
+    'toToolArrays order and list indices',
+);
+
 $force = new ChatCompletionOptions(tool_choice: ['type' => 'function', 'function' => ['name' => 'get_weather']]);
 $assert($force->toRequestBody()['tool_choice']['function']['name'] === 'get_weather', 'tool_choice object');
 

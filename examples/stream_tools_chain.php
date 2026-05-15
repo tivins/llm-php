@@ -26,10 +26,7 @@ require __DIR__ . '/../vendor/autoload.php';
 
 $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
 
-$toolSchemas = array_map(
-    static fn (ChatFunctionTool $tool): array => $tool->toToolArray(),
-    PredefinedTools::all(),
-);
+$toolSchemas = ChatFunctionTool::toToolArrays(PredefinedTools::all());
 
 $conversation = new Conversation();
 $conversation->addMessage(new Message(Role::System, BehaviorPrompts::HELPFUL));
