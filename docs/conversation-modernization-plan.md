@@ -74,6 +74,8 @@ Tests pertinents pour la suite du plan :
 
 **Objectif** : introduire des structures **sérialisables en JSON** qui capturent une réponse complète ou une trace stream, **sans encore** modifier le comportement des boucles d’outils ni tous les exemples.
 
+**Implémentation (2026-05-15)** : classes sous `src/Tivins/Llama/Dto/` ; tests `tests/turn_record_test.php` ; fixtures `tests/fixtures/chat_completion_response_min.json`, `tests/fixtures/turn_record_completion_expected.json`.
+
 ### 1.1 Types / classes proposés (noms indicatifs)
 
 | Artefact | Rôle |
@@ -97,9 +99,9 @@ Tests pertinents pour la suite du plan :
 
 **Validation**
 
-- [ ] Tests unitaires : `TurnRecord::toLogArray()` → `json_encode` OK ; round-trip ou Golden file minimal sur un fixture JSON de réponse chat completion (sans dépendre du réseau).
-- [ ] `composer` autoload : nouvelles classes découvertes sans erreur.
-- [ ] Aucune régression sur les tests existants (`tests/`).
+- [x] Tests unitaires : `TurnRecord::toLogArray()` → `json_encode` OK ; round-trip ou Golden file minimal sur un fixture JSON de réponse chat completion (sans dépendre du réseau).
+- [x] `composer` autoload : nouvelles classes découvertes sans erreur.
+- [x] Aucune régression sur les tests existants (`tests/`).
 
 **Critère de passage** : tests verts + revue du schéma JSON documentée en PHPDoc ou dans un fichier `docs/turn-record-schema.md` (optionnel, seulement si le schéma devient volumineux).
 
@@ -308,7 +310,7 @@ Après la boucle, `$conversation` doit contenir, dans l’ordre :
 | Étape | Statut | Notes / PR / commit |
 |-------|--------|---------------------|
 | 0 | ☑ Terminé | Inventaire 2026-05-15 ; décisions JSONL + dossier logs — voir « Décisions à tracer » |
-| 1 | ☐ Non démarré | |
+| 1 | ☑ Terminé | DTO `src/Tivins/Llama/Dto/` ; `tests/turn_record_test.php` + fixtures JSON |
 | 2 | ☐ Non démarré | |
 | 3 | ☐ Non démarré | |
 | 4 | ☐ Non démarré | |

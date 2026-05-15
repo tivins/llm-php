@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.13.0 — 2026-05-15
+
+- Feature: logging / audit DTOs under `Tivins\Llama\Dto` — `StreamEventKind`, `StreamEvent`, `RawStreamTrace`, `RawChatCompletionResponse`, and `TurnRecord` (`forCompletion` / `forStream`, `toLogArray()` JSON-safe). Golden fixture test in `tests/turn_record_test.php`.
+
 ## 1.12.2 — 2026-05-15
 
 - Feature: `ChatFunctionTool::toToolArrays(iterable)` builds the OpenAI `tools` payload from several tools (examples updated).
