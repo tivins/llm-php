@@ -68,7 +68,7 @@ final class StreamingToolCallingLoop
             $capture = $onAssistantStreamRound !== null ? new SsePayloadCapture() : null;
             $result = $this->lama->chatStream($conversation, $onDelta, $options, $onToolCallChunk, $onReasoningDelta, $capture);
             if ($onAssistantStreamRound !== null && $capture !== null) {
-                $trace = new RawStreamTrace(events: [], rawDataLines: array_values($capture->lines));
+                $trace = new RawStreamTrace(events: [], rawDataLines: $capture->lines);
                 $onAssistantStreamRound($result, $trace, $round);
             }
 

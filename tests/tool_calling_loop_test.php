@@ -43,7 +43,7 @@ final class FakeLama extends Lama
     public function __construct(array $responses)
     {
         parent::__construct('http://127.0.0.1:9', 'fake');
-        $this->responses = array_values($responses);
+        $this->responses = $responses;
     }
 
     public function chatCompletions(Conversation $conversation, ?ChatCompletionOptions $options = null): array
@@ -69,7 +69,7 @@ final class FakeStreamLama extends Lama
     public function __construct(array $results)
     {
         parent::__construct('http://127.0.0.1:9', 'fake');
-        $this->results = array_values($results);
+        $this->results = $results;
     }
 
     /**

@@ -96,12 +96,12 @@ final class ChatCompletionOptions
                     $out['stop'] = $this->stop;
                 }
             } elseif ($this->stop !== []) {
-                $out['stop'] = array_values($this->stop);
+                $out['stop'] = $this->stop;
             }
         }
 
         if ($this->tools !== null && $this->tools !== []) {
-            $out['tools'] = array_values($this->tools);
+            $out['tools'] = $this->tools;
         }
         if ($this->tool_choice !== null) {
             if (!is_string($this->tool_choice) || $this->tool_choice !== '') {

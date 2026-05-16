@@ -2,7 +2,7 @@
 
 # llm-php (`tivins/llm-php`)
 
-**Version:** 1.20.3 (see [`composer.json`](composer.json); release history in [`CHANGELOG.md`](CHANGELOG.md)).
+**Version:** 1.20.4 (see [`composer.json`](composer.json); release history in [`CHANGELOG.md`](CHANGELOG.md)).
 
 PHP client library for an **OpenAI-compatible** HTTP API—typically **[llama.cpp `llama-server`](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)**—covering `POST /v1/chat/completions` (non-stream and **SSE** stream), plus **`/health`**, **`/tokenize`**, and model discovery via **`GET /v1/models`**.
 

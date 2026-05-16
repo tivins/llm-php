@@ -107,7 +107,7 @@ final readonly class TurnRecord
             return null;
         }
 
-        return array_values($messages);
+        return $messages;
     }
 
     /**
@@ -186,7 +186,7 @@ final readonly class TurnRecord
                 }
             }
             if ($parsedMessages !== []) {
-                $requestMessages = array_values($parsedMessages);
+                $requestMessages = $parsedMessages;
             }
         }
 

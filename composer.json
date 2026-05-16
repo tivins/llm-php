@@ -1,6 +1,6 @@
 {
     "name": "tivins/llm-php",
-    "version": "1.20.3",
+    "version": "1.20.4",
     "license": "MIT",
     "description": "PHP library for local LLMs",
     "keywords": ["llm", "local", "llama", "php"],

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.20.4 — 2026-05-16
+
+- Dev: PHPStan level 5 — removed redundant `array_values()` calls where operands are already `list<>`-typed sequences.
+
 ## 1.20.3 — 2026-05-16
 
 - Dev: PHPStan level 4 clean-up (redundant guards, dead paths, bootstrap for example helpers); clarified synthetic test cases and CLI argv handling under static analysis.

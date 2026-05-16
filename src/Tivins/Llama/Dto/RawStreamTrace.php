@@ -35,7 +35,7 @@ final readonly class RawStreamTrace
         }
         $out = ['events' => $events];
         if ($this->rawDataLines !== null) {
-            $out['raw_data_lines'] = array_values($this->rawDataLines);
+            $out['raw_data_lines'] = $this->rawDataLines;
         }
 
         return $out;
@@ -68,7 +68,7 @@ final readonly class RawStreamTrace
                 }
             }
             if ($lines !== []) {
-                $rawDataLines = array_values($lines);
+                $rawDataLines = $lines;
             }
         }
 

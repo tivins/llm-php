@@ -66,9 +66,8 @@ class Translator
             return [];
         }
 
-        $normalized = array_values($texts);
-        if (count($normalized) === 1) {
-            return [$this->translate($normalized[0], $from, $to)];
+        if (count($texts) === 1) {
+            return [$this->translate($texts[0], $from, $to)];
         }
 
         $system = BehaviorPrompts::TRANSLATOR . <<<'TXT'
@@ -81,7 +80,7 @@ TXT;
         $payload = [
             'source_language' => $from,
             'target_language' => $to,
-            'parts' => $normalized,
+            'parts' => $texts,
         ];
 
         $conversation = new Conversation();
@@ -90,10 +89,10 @@ TXT;
 
         $raw = trim($this->lama->chat($conversation));
         $decoded = self::decodeTranslationsJsonArray($raw);
-        if (count($decoded) !== count($normalized)) {
+        if (count($decoded) !== count($texts)) {
             throw new RuntimeException(sprintf(
                 'Batch translation expected %d segments, got %d',
-                count($normalized),
+                count($texts),
                 count($decoded),
             ));
         }
