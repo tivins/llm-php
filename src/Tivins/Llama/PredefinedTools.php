@@ -1042,19 +1042,12 @@ class PredefinedTools
 
         /** @var list<string> */
         $out = [];
-        if (!isset($m[1]) || !is_array($m[1])) {
-            return $out;
-        }
-
         foreach ($m[1] as $rawLine) {
-            if (!is_string($rawLine)) {
-                continue;
-            }
-
             // Use the first tab-separated field (GNU diff appends mtime after a tab on the same line).
-            $firstField = preg_split("#\t#", $rawLine, 2)[0] ?? $rawLine;
+            $split = preg_split("#\t#", $rawLine, 2);
+            $firstField = $split[0] ?? $rawLine;
             $pathTrim = trim($firstField);
-            if (preg_match('#^"(.+)"$#', $pathTrim, $q) === 1 && isset($q[1])) {
+            if (preg_match('#^"(.+)"$#', $pathTrim, $q) === 1) {
                 $pathTrim = $q[1];
             }
 
@@ -1080,7 +1073,7 @@ class PredefinedTools
             $candidates = [];
 
             $candidates[] = $workingReal . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $rel);
-            if (preg_match('#^(?:a|b)/(.*)$#D', $rel, $nm) === 1 && isset($nm[1])) {
+            if (preg_match('#^(?:a|b)/(.*)$#D', $rel, $nm) === 1) {
                 $candidates[] = $workingReal . DIRECTORY_SEPARATOR
                     . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $nm[1]);
             }

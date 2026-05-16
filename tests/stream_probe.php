@@ -28,7 +28,7 @@ function stream_probe_collapse_consecutive_duplicates(array $deltas): array
     $out = [];
     $last = null;
     foreach ($deltas as $d) {
-        if (!is_string($d) || $d === '') {
+        if ($d === '') {
             continue;
         }
         if ($d === $last) {
@@ -57,7 +57,7 @@ function stream_probe_analyze(array $deltas): array
 {
     $nonEmpty = [];
     foreach ($deltas as $d) {
-        if (is_string($d) && $d !== '') {
+        if ($d !== '') {
             $nonEmpty[] = $d;
         }
     }
@@ -118,7 +118,7 @@ function merge_stream_deltas_incremental(array $deltas): string
     $out = '';
     $last = '';
     foreach ($deltas as $d) {
-        if (!is_string($d) || $d === '') {
+        if ($d === '') {
             continue;
         }
         if ($d === $last) {
@@ -141,7 +141,7 @@ function merge_stream_deltas_cumulative(array $deltas): string
 {
     $last = '';
     foreach ($deltas as $d) {
-        if (!is_string($d) || $d === '') {
+        if ($d === '') {
             continue;
         }
         if ($d === $last) {
@@ -375,7 +375,6 @@ function stream_probe_run_synthetic_tests(): void
 
     $failed = 0;
     foreach ($cases as $name => $case) {
-        /** @var list<string> $deltas */
         $deltas = $case['deltas'];
         $analysis = stream_probe_analyze($deltas);
         $inc = merge_stream_deltas_incremental($deltas);
@@ -411,15 +410,15 @@ if (PHP_SAPI !== 'cli') {
     exit('Run from CLI: php stream_probe.php' . PHP_EOL);
 }
 
-$argv = array_slice($argv, 1);
-if (in_array('--synthetic', $argv, true)) {
+$argvCli = isset($_SERVER['argv']) ? array_slice($_SERVER['argv'], 1) : [];
+if (in_array('--synthetic', $argvCli, true)) {
     stream_probe_run_synthetic_tests();
     exit(0);
 }
 
-$verbose = in_array('--verbose', $argv, true) || in_array('-v', $argv, true);
-$compare = in_array('--compare', $argv, true);
-$shortPrompt = in_array('--short-prompt', $argv, true);
+$verbose = in_array('--verbose', $argvCli, true) || in_array('-v', $argvCli, true);
+$compare = in_array('--compare', $argvCli, true);
+$shortPrompt = in_array('--short-prompt', $argvCli, true);
 
 try {
     stream_probe_main($verbose, $compare, $shortPrompt);

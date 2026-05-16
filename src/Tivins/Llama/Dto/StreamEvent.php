@@ -53,9 +53,6 @@ final readonly class StreamEvent
         if (is_array($payload)) {
             return new self($kind, $payload);
         }
-        if ($payload === null) {
-            return new self($kind, '');
-        }
 
         return new self($kind, (string) json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
     }

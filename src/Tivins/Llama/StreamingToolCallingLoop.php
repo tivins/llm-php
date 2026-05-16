@@ -117,10 +117,6 @@ final class StreamingToolCallingLoop
             }
         }
 
-        if ($result === null) {
-            throw new RuntimeException('No stream result produced (maxRounds was 0)');
-        }
-
         if ($result->hasToolCalls()) {
             throw new RuntimeException(
                 'Streaming tool calling loop exhausted $maxRounds while the assistant still returned tool_calls; '

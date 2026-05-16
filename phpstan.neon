@@ -3,6 +3,10 @@ parameters:
   # Target a specific PHP Version (8.2.0 => 80200)
   phpVersion: 80300
 
+  bootstrapFiles:
+    # Global helper functions referenced from tests/scripts (psr-4 autoload would not expose them).
+    - examples/_helpers.php
+
   paths:
     - src
     - tests

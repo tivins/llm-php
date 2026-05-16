@@ -47,9 +47,6 @@ final class HumanTurnRenderer
         if ($out->usage !== null && $out->usage !== []) {
             self::fwriteNl($stdout, self::stylize($opts, 'Usage', '1'));
             foreach ($out->usage as $k => $v) {
-                if (!is_string($k)) {
-                    continue;
-                }
                 $label = ucfirst(str_replace('_', ' ', $k));
                 self::fwriteNl($stdout, '  - ' . $label . ': ' . self::scalarToLine($v));
             }
@@ -129,9 +126,6 @@ final class HumanTurnRenderer
         self::fwriteNl($stdout, self::stylize($opts, 'Request messages', '36;1'));
 
         foreach ($messages as $i => $row) {
-            if (!is_array($row)) {
-                continue;
-            }
             $role = isset($row['role']) && is_string($row['role']) ? $row['role'] : '?';
             $roleStyle = match ($role) {
                 'system' => '34;1',

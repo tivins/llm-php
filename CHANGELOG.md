@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.20.3 — 2026-05-16
+
+- Dev: PHPStan level 4 clean-up (redundant guards, dead paths, bootstrap for example helpers); clarified synthetic test cases and CLI argv handling under static analysis.
+
 ## 1.20.2 — 2026-05-16
 
 - Docs: removed completed roadmap `docs/conversation-modernization-plan.md`; README points contributors to `CHANGELOG.md` and in-repo sections instead.

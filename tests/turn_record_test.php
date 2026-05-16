@@ -72,8 +72,6 @@ $record = TurnRecord::forCompletion(
     createdAtIso8601: '2026-01-01T12:00:00+00:00',
 );
 $log = $record->toLogArray();
-$encoded = json_encode($log, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-$assert(is_string($encoded), 'completion TurnRecord json_encode OK');
 
 /** @var array<string, mixed> $expectedLog */
 $expectedLog = json_decode((string) $expectedJson, true, flags: JSON_THROW_ON_ERROR);

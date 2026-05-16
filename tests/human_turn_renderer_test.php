@@ -29,7 +29,7 @@ $assert = static function (bool $cond, string $msg) use (&$failed): void {
     }
 };
 
-$assertContains = static function (string $haystack, string $needle, string $msg) use (&$failed, $assert): void {
+$assertContains = static function (string $haystack, string $needle, string $msg) use ($assert): void {
     $assert(str_contains($haystack, $needle), $msg . ' — got: ' . $haystack);
 };
 
