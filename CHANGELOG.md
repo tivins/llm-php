@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.20.5 — 2026-05-16
+
+- Examples: `examples/replay_turn_jsonl.php` — résumé `usage` (tokens) sous chaque en-tête de tour et cumul des totaux facturables par tour lorsque le journal les inclut.
+
 ## 1.20.4 — 2026-05-16
 
 - Dev: PHPStan level 5 — removed redundant `array_values()` calls where operands are already `list<>`-typed sequences.

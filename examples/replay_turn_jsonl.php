@@ -11,8 +11,11 @@ declare(strict_types=1);
  *
  * - {@code --sse} : rejoue les fragments bruts SSE ({@code raw_data_lines}) ou les {@code events} structurés quand présents.
  *   Sans ce drapeau, seul le résumé agrégé ({@code stream_result} / {@code raw_completion}) est affiché pour éviter des sorties énormes.
+ *
+ * Sous chaque en-tête de tour : résumé {@code usage} (tokens) et cumul des totaux par tour quand le journal les contient.
  */
 
+use Tivins\Llama\Dto\NormalizedTurnOutcome;
 use Tivins\Llama\Dto\StreamEvent;
 use Tivins\Llama\Dto\StreamEventKind;
 use Tivins\Llama\Dto\TurnRecord;
@@ -73,8 +76,96 @@ Usage: php examples/replay_turn_jsonl.php <fichier.jsonl> [--sse] [--no-ansi] [-
   --no-ansi       Désactive les codes couleur (ou définir TIVINS_LLAMA_NO_ANSI=1).
   --no-dividers   Masque les filets entre tours assistant.
 
+Les blocs "Usage" du rendu détaillé viennent de l'API (champ usage). Ce script affiche aussi
+un résumé sous chaque en-tête de tour et un cumul des total_tokens par tour lorsqu'ils sont présents.
+
 TXT;
     fwrite(STDOUT, $msg);
+}
+
+/** @param array<string, mixed>|null $usage */
+function replay_int_usage_field(?array $usage, string $key): ?int
+{
+    if ($usage === null || !array_key_exists($key, $usage)) {
+        return null;
+    }
+    $v = $usage[$key];
+    if (is_int($v)) {
+        return $v;
+    }
+    if (is_float($v)) {
+        return (int) round($v);
+    }
+    if (is_string($v) && is_numeric($v)) {
+        return (int) $v;
+    }
+
+    return null;
+}
+
+/**
+ * Total facturable du tour : {@code total_tokens} si présent, sinon prompt + completion.
+ *
+ * @param array<string, mixed>|null $usage
+ */
+function replay_turn_billable_total_tokens(?array $usage): ?int
+{
+    if ($usage === null || $usage === []) {
+        return null;
+    }
+    $total = replay_int_usage_field($usage, 'total_tokens');
+    if ($total !== null) {
+        return $total;
+    }
+    $p = replay_int_usage_field($usage, 'prompt_tokens');
+    $c = replay_int_usage_field($usage, 'completion_tokens');
+    if ($p !== null && $c !== null) {
+        return $p + $c;
+    }
+
+    return null;
+}
+
+function replay_outcome_from_turn_record(TurnRecord $record): NormalizedTurnOutcome
+{
+    if ($record->mode === 'completion') {
+        $data = $record->completionResponse !== null ? $record->completionResponse->data : [];
+
+        return NormalizedTurnOutcome::fromChatCompletionArray($data);
+    }
+    if ($record->streamResult === null) {
+        throw new \InvalidArgumentException('stream TurnRecord attend streamResult.');
+    }
+
+    return NormalizedTurnOutcome::fromStreamResult($record->streamResult);
+}
+
+/**
+ * Ligne courte sous l'en-tête de tour : tokens de ce tour + cumul des total_tokens des tours précédents.
+ */
+function replay_format_usage_progress_line(NormalizedTurnOutcome $outcome, ?int $cumulativeAfterTurn): string
+{
+    $usage = $outcome->usage;
+    if ($usage === null || $usage === []) {
+        return 'Tokens : non présents dans ce journal pour ce tour (le serveur n’a pas renvoyé `usage`, ou seulement en stream partiel — essayer --sse pour les événements [usage]).';
+    }
+
+    $parts = [];
+    foreach (['prompt_tokens', 'completion_tokens', 'total_tokens'] as $k) {
+        $n = replay_int_usage_field($usage, $k);
+        if ($n !== null) {
+            $parts[] = str_replace('_', ' ', $k) . '=' . $n;
+        }
+    }
+    $line = $parts !== []
+        ? 'Tokens (ce tour) : ' . implode(', ', $parts)
+        : 'Tokens (ce tour) : ' . json_encode($usage, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    if ($cumulativeAfterTurn !== null) {
+        $line .= ' — cumul (somme des totaux facturables par tour : total_tokens, ou prompt+completion) : ' . $cumulativeAfterTurn;
+    }
+
+    return $line;
 }
 
 /** @param mixed $payload */
@@ -243,6 +334,7 @@ if ($handle === false) {
 
 $lineNum = 0;
 $turnIndex = 0;
+$cumulativeBillableTokens = 0;
 
 try {
     while (($line = fgets($handle)) !== false) {
@@ -285,6 +377,22 @@ try {
             ),
         );
 
+        $outcome = replay_outcome_from_turn_record($record);
+        $turnBillable = replay_turn_billable_total_tokens($outcome->usage);
+        $cumulativeAfterTurn = null;
+        if ($turnBillable !== null) {
+            $cumulativeBillableTokens += $turnBillable;
+            $cumulativeAfterTurn = $cumulativeBillableTokens;
+        }
+        HumanTurnRenderer::fwriteNl(
+            $stdout,
+            HumanTurnRenderer::stylize(
+                $baseOpts,
+                replay_format_usage_progress_line($outcome, $cumulativeAfterTurn),
+                '2',
+            ),
+        );
+
         HumanTurnRenderer::renderTurnRecordRequestMessages($record, $baseOpts);
 
         if ($record->requestOptions !== null && $record->requestOptions !== []) {
@@ -308,6 +416,17 @@ try {
     }
 } finally {
     fclose($handle);
+}
+
+if ($cumulativeBillableTokens > 0) {
+    HumanTurnRenderer::fwriteNl(
+        $baseOpts->stdout(),
+        HumanTurnRenderer::stylize(
+            $baseOpts,
+            '══ Fin de lecture JSONL — cumul tokens (somme par tour) : ' . $cumulativeBillableTokens . ' ══',
+            '36;1',
+        ),
+    );
 }
 
 exit(0);
