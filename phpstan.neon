@@ -1,0 +1,10 @@
+parameters:
+
+  # Target a specific PHP Version (8.2.0 => 80200)
+  phpVersion: 80300
+
+  paths:
+    - src
+    - tests
+
+  level: 4
