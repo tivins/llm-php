@@ -111,8 +111,8 @@ function moderatePost(Lama $lama, string $topic, string $author, string $post): 
 try {
 $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
 
-if ($lama->getHealth() !== 'ok') {
-    throw new Exception("Server is not healthy. Aborting.");
+if (!$lama->isHealthy()) {
+    throw new RuntimeException('Server is not healthy. Aborting.');
 }
 
 echo "=================================================================\n";

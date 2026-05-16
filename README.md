@@ -65,7 +65,7 @@ $conversation->addMessage(new Message(Role::User, 'Hello.'));
 $text = $lama->chat($conversation);
 ```
 
-`Lama::fromServerUrl()` picks the **first** model id from `/v1/models`. Check `$lama->getHealth()` returns `'ok'` before relying on the server.
+`Lama::fromServerUrl()` picks the **first** model id from `/v1/models`. Check `$lama->isHealthy()` returns `true` before relying on the server.
 
 Sampling and generation knobs (`temperature`, `top_p`, `max_tokens`, penalties, `seed`, `stop`, `n`, **`tools`**, **`tool_choice`**) go through **`Tivins\Llama\ChatCompletionOptions`**: only properties you set are merged into the JSON body; omitted keys leave server defaults.
 
@@ -89,7 +89,7 @@ Sampling and generation knobs (`temperature`, `top_p`, `max_tokens`, penalties, 
 
 ### Client
 
-- **`Tivins\Llama\Lama`** — HTTP client: `fromServerUrl()`, `getHealth()` / `getHealthRaw()`, `tokenize()`, `chat()`, `chatCompletions()`, `chatStream()`.
+- **`Tivins\Llama\Lama`** — HTTP client: `fromServerUrl()`, `isHealthy()` / `getHealth()`, `tokenize()`, `chat()`, `chatCompletions()`, `chatStream()`.
 
 ### Conversation model
 

@@ -54,16 +54,17 @@ class Lama
      */
     public function getHealth(): string
     {
-        $raw = $this->getHealthRaw();
-        return (string) ($raw['status'] ?? '');
+        return $this->isHealthy() ? 'ok' : 'error';
     }
 
     /**
      * @throws JsonException
      */
-    public function getHealthRaw(): array
+    public function isHealthy(): bool
     {
-        return $this->request($this->url . '/health', 'GET', []);
+        $raw = $this->request($this->url . '/health', 'GET', []);
+        $status = $raw['status'] ?? '';
+        return $status === 'ok';
     }
 
     /**

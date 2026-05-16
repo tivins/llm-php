@@ -16,8 +16,8 @@ require __dir__ . '/../vendor/autoload.php';
 
 $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
 try {
-    if ($lama->getHealth() !== 'ok') {
-        throw new Exception("System is down");
+    if (!$lama->isHealthy()) {
+        throw new Exception("Server is not healthy. Aborting.");
     }
 
     

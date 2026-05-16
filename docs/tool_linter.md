@@ -2,7 +2,7 @@ ajouter un tool "lint" qui prend en paramètre "language" et "file(s)".
 
 selon l'extension du fichier, on détermine le language et le linter.
 
-Si le host n'a pas l'outil accesible, on retourne une erreur.
+Si le host n'a pas l'outil accesible pour le langage donné, on retourne une erreur.
 
 Sinon, on execute le lint et on renvoi la sortie brute.
 

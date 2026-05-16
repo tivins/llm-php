@@ -121,7 +121,7 @@ function askFollowUp(Lama $lama, Conversation $conv, string $question): string
 try {
     $lama = Lama::fromServerUrl('http://127.0.0.1:8080');
 
-    if ($lama->getHealth() !== 'ok') {
+    if (!$lama->isHealthy()) {
         throw new Exception("Server is not healthy. Aborting.");
     }
 

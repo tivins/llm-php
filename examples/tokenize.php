@@ -58,6 +58,9 @@ if ($serverUrl === '') {
 }
 try {
     $lama = Lama::fromServerUrl($serverUrl);
+    if (!$lama->isHealthy()) {
+        throw new Exception('Server is not healthy. Aborting.');
+    }
     $tokens = $lama->tokenize($text);
     if ($showTokensCount) {
         echo count($tokens) . "\n";
